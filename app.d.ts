@@ -7,6 +7,7 @@ declare global {
         }
     }
 }
+
 export declare const log: bunyan;
 declare const app: Express;
 export default app;

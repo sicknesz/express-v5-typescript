@@ -18,20 +18,8 @@ import type { LoggerOptions } from 'bunyan'
 // read .env files and populate process.env
 dotenv.config();
 
-interface ResponseError extends Error {
-  status?: number;
-}
-
-declare global {
-  namespace NodeJS {
-    interface Process {
-      log: bunyan;
-    }
-  }
-}
-
 const loggerOptions: LoggerOptions = {
-  name: "cdiet-application",
+  name: "express-typescript-node",
   src: true,
   serializers: bunyan.stdSerializers,
   streams: [
@@ -42,9 +30,9 @@ const loggerOptions: LoggerOptions = {
     },
     {
       type: 'rotating-file',
-      path: './express.log',
-      period: '1d', // Rotate daily
-      count: 3     // Keep 3 back copies
+      path: './logs/express-typescript-node.log',
+      period: '30d', // Rotate monthly
+      count: 12     // Keep 12 back copies
     },
   ],
 }
@@ -67,7 +55,7 @@ app.set('view engine', 'jade');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(favicon(path.join(__dirname, "../../public", "favicon.ico")));
+app.use(favicon(path.join(import.meta.dirname, "public", "favicon.ico")));
 
 // use this if behing a reverse proxy in production
 app.set("trust proxy", 1); // trust first proxy
@@ -77,11 +65,10 @@ app.use(
   // protect encryption using hsts
   helmet.hsts({
     maxAge: ONE_YEAR,
-    includeSubDomains: true,
-    force: true,
+    includeSubDomains: true
   }),
 );
-app.use(helmet.hidePoweredBy({ setTo: "v5" }));
+app.use(helmet.hidePoweredBy());
 
 // allow big files 
 app.use(
@@ -116,7 +103,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // error handler
-app.use((err: ResponseError, req: Request, res: Response, next: NextFunction) => {
+app.use((err: HttpError, req: Request, res: Response, next: NextFunction) => {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
@@ -127,7 +114,7 @@ app.use((err: ResponseError, req: Request, res: Response, next: NextFunction) =>
 });
 
 // TODO : IMPORTANT - do not forget to set origin 
-app.all("/*", (req, res, next) => {
+app.all("/*splat", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", process.env.ORIGIN ? process.env.ORIGIN : "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-type, Accept, X-Access-Token, X-Key, Data-Type, Origin, X-Requested-With, Content-Type, Accept, Authorization");

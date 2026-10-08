@@ -3,7 +3,7 @@
 /**
  * Module dependencies.
  */
-import type { HttpError, HttpErrorConstructor } from 'http-errors';
+import type { HttpError } from 'http-errors';
 import app, { log } from '../app.ts';
 import http from 'http';
 
