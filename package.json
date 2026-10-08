@@ -1,0 +1,30 @@
+{
+  "name": "express-typescript-latest",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "tsx ./bin/server.ts",
+    "debug": "tsx --inspect-brk=0.0.0.0:9229 ./bin/server.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@types/bunyan": "1.8.11",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/http-errors": "^2.0.5",
+    "@types/morgan": "^1.9.10",
+    "@wesleytodd/openapi": "^1.1.0",
+    "bunyan": "1.8.15",
+    "cookie-parser": "1.4.7",
+    "debug": "2.6.9",
+    "dotconfig": "^0.0.1-security",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "http-errors": "^2.0.1",
+    "jade": "~1.11.0",
+    "morgan": "1.9.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
