@@ -184,8 +184,8 @@ describe('crypto/provider', () => {
       const buf = await readFile(encrypted);
       const bodyStart = 29; // HEADER_LEN = 29
       if (buf.length > bodyStart + 5) {
-        buf[bodyStart] ^= 0xff;
-        buf[bodyStart + 1] ^= 0xff;
+        buf[bodyStart] = buf[bodyStart]! ^ 0xff;
+        buf[bodyStart + 1] = buf[bodyStart + 1]! ^ 0xff;
         await writeFile(encrypted, buf);
       }
 

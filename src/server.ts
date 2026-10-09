@@ -4,10 +4,10 @@
  * Module dependencies.
  */
 import type { HttpError } from 'http-errors';
-import app, { log } from '../app.ts';
+import app, { log } from './app.ts';
 import http from 'http';
+import { Server } from 'socket.io';
 
-log.debug('express:server');
 
 /**
  * Get port from environment and store in Express.
@@ -19,6 +19,56 @@ app.set('port', port);
  * Create HTTP server.
  */
 const server = http.createServer(app);
+
+interface ClientToServerEvents {
+  greeting: (arg: string) => void;
+}
+
+/**
+ * Create socket.io server.
+ */
+const io = new Server(server, { path: "/sockets", transports: ["websocket"] });
+
+io.on("connection", (socket) => {
+  socket.conn.on("upgrade", (transport) => {
+    log.debug(`[Socket.io]: transport upgraded to ${transport.name}`);
+  });
+
+  socket.on("disconnect", (reason) => {
+    log.debug(`[Socket.io]: disconnected due to ${reason}`);
+  });
+
+  socket.emit("greeting", "hello from server")
+})
+
+// websocket client connection auth handle
+io.use((socket, next) => {
+
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    return next(new Error('Authentication error: Token required'));
+  }
+  try {
+    // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // socket.user = decoded; // Attach user info to the socket object
+    // log.debug(decoded, "[Socket.io][jwt]: socket.io client authed");
+    // next();
+  } catch (error) {
+    socket.emit("disconnect");
+    return next(new Error('Authentication error: Invalid token'));
+  }    
+
+
+  socket.on("connect_error", (err) => {
+    // { name: 'TRANSPORT_MISMATCH', transport: 'websocket', previousTransport: 'polling' }
+    log.error("[Socket.io][ERROR]: ", err.code, err.message, err.context);
+  });
+});
+
+/**
+ * make socket.io accessible throughout the whole application - req.app.get("socket.io") is inside an handler
+ */
+app.set("socket.io", io);
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -89,6 +139,5 @@ function onListening() {
       : 'Port ' + port;
     log.info('Listening on ' + bind);
   }
-
-
+  else console.log("Listening ...")
 }

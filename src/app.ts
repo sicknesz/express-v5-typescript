@@ -125,9 +125,7 @@ app.all("/*splat", (req, res, next) => {
   }
 });
 
-/**
- * @brief use to report crash and do post-mortem forensics
- */
+
 function reportCrash() {
   const reportString = JSON.stringify(report.getReport(), null, 2);
   report.writeReport();
@@ -156,7 +154,6 @@ if (report.reportOnUncaughtException) {
 
   // Catch : uncaught exception callback
   process.setUncaughtExceptionCaptureCallback((err: unknown) => {
-    debugger
     if (err instanceof Error) {
       log.error(`[Application]: Capture Uncaught Exception : ${err.message}, Writing nodeJS report to disk, send an email to developpers`);
     }
@@ -176,13 +173,6 @@ process.on("SIGINT", () => {
 // process.on("SIGKILL", () => {
 //   log.warn("[Application]: Got SIGKILL");
 // });
-
-process.on("warning", (err: unknown) => {
-  if (err instanceof Error) {
-    log.error(err.message, "[Application]: Got 'warning' event ");
-    console.error(err.stack);
-  }
-});
 
 
 export default app;

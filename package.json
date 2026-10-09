@@ -4,8 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "tsx ./bin/server.ts",
-    "debug": "tsx --inspect-brk=0.0.0.0:9229 ./bin/server.ts",
+    "start": "tsx ./src/server.ts",
+    "debug": "tsx --inspect-brk=0.0.0.0:9229 ./src/server.ts",
     "typecheck": "tsc",
     "test": "vitest run"
   },
@@ -28,6 +28,7 @@
     "jade": "~1.11.0",
     "morgan": "1.9.1",
     "serve-favicon": "^2.5.1",
+    "socket.io": "^4.8.4",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
