@@ -3,8 +3,10 @@ import mongoose from "mongoose"
 import type { Request, Response } from "express"
 import type { Model } from "mongoose"
 
+type Entity = Model<any, any, any, any, any, any >;
+
 // FIXME : any
-const create = async (model: any, req: Request, res: Response) => {
+const create = async (model: Entity, req: Request, res: Response) => {
 
   const result = await new model({
     ...req.body,
@@ -14,11 +16,11 @@ const create = async (model: any, req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     result,
-    message: 'Successfully Created the document in Model ',
+    message: 'Successfully created the document of type',
   });
 };
 
-const read = async (model: any, req: Request, res: Response) => {
+const read = async (model: Entity, req: Request, res: Response) => {
 
   // Find document by id
   const result = await model.findOne({ _id: req.params.id }).exec();
@@ -42,7 +44,7 @@ const read = async (model: any, req: Request, res: Response) => {
 };
 
 // Warning : use pagination on big collections
-const readAll = async (model: any, req: Request, res: Response) => {
+const readAll = async (model: Entity, req: Request, res: Response) => {
 
   // Find document by id
   const result = await model.findOne({}).exec();
@@ -65,7 +67,7 @@ const readAll = async (model: any, req: Request, res: Response) => {
   }
 };
 
-const update = async (model: any, req: Request, res: Response) => {
+const update = async (model: Entity, req: Request, res: Response) => {
 
   const result = await model.findOneAndUpdate(
     {
@@ -93,7 +95,7 @@ const update = async (model: any, req: Request, res: Response) => {
   }
 };
 
-const remove = async (model, req: Request, res: Response) => {
+const remove = async (model: Entity, req: Request, res: Response) => {
 
   // Find the document by id and delete it
   const result = await model.findOneAndUpdate(
@@ -123,7 +125,7 @@ const remove = async (model, req: Request, res: Response) => {
   }
 };
 
-const createCRUDController = (modelName: string) => {
+function createCRUDController(modelName: string) {
   const model = mongoose.model(modelName);
 
   return {

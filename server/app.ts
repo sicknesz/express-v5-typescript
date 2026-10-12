@@ -8,13 +8,28 @@ import bunyan, { RotatingFileStream } from 'bunyan';
 import { report } from "node:process";
 import fs from "node:fs/promises"
 import mongoose from "mongoose";
-import debugPackage from "debug";
-
+import passport from "passport";
+import dotenv from "dotenv"
 // @ts-ignore
 import openApi from '@wesleytodd/openapi';
 import favicon from "serve-favicon";
 import helmet from "helmet"
-import { Server } from 'socket.io';
+
+import {
+  ok,
+  Ok,
+  err,
+  Err,
+  Result,
+  okAsync,
+  errAsync,
+  ResultAsync,
+  fromAsyncThrowable,
+  fromThrowable,
+  fromPromise,
+  fromSafePromise,
+  safeTry,
+} from 'neverthrow'
 
 // Local imports
 import indexRouter from "./routes/index.ts"
@@ -22,11 +37,17 @@ import usersRouter from "./routes/sandbox.ts"
 import initWebsocket from "./websockets.ts";
 import createCRUDController from "./controllers/createCrudController.ts"
 
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Model } from "mongoose"
+import type { Express, IRouter, Request, Response, NextFunction } from "express";
 
+
+type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
+type Controller = { name: string, model: Model<any, any, any, any, any, any, any> };
 
-debugPackage("Express app");
+export const controllers = new Map<string, Controller['model']>();
+
+dotenv.config()
 
 const loggerOptions: bunyan.LoggerOptions = {
   name: "express-typescript-node",
@@ -54,60 +75,57 @@ const ONE_YEAR = 1000 * 60 * 60 * 24 * 365;
 const app: Express = express();
 
 /**
+ * @brief middleware for debug/testing
+ * @param req {Request}
+ * @param res {Response}
+ * @param next {NextFunction}
+ */
+const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  log.debug(`Got ${req.url} - ${new Date(Date.now()).toLocaleDateString("fr-FR")}`);
+  next();
+}
+
+/**
  * Get port from environment and store in Express.
  */
 const port = normalizePort(process.env.PORT || '3000');
-app.set('port', port);
-
 const server = app.listen(port);
+
 server.on('error', onError);
 server.on('listening', onListening);
 
-
+/**
+ * Initialize websocket streams/events handlers 
+ */
 const io = initWebsocket(server);
+app.set('port', port);
 app.set("socket.io", io);
-
 
 log.debug("[Application]: server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
 // view engine setup
 app.set('views', path.join(import.meta.dirname, 'views'));
 app.set('view engine', 'jade');
-
-// @ts-ignore
 app.use(logger('dev'));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(favicon(path.join(import.meta.dirname, "public", "favicon.ico")));
-
-// app.options('*', cors()); // include before other routes
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
-
-// use this if behing a reverse proxy in production
-app.set("trust proxy", 1); // trust first proxy
-
-
-app.use(
-  // protect encryption using hsts
-  helmet.hsts({
-    maxAge: ONE_YEAR,
-    includeSubDomains: true
-  }),
-);
+app.use(express.static(path.join(import.meta.dirname, 'public')));
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
+app.set("trust proxy", 1); // use this if behing a reverse proxy in production
+app.use(helmet.hsts({
+  maxAge: ONE_YEAR,
+  includeSubDomains: true
+}));
 app.use(helmet.hidePoweredBy());
-
-// allow big files 
-app.use(
-  express.urlencoded({
-    limit: "500mb",
-    extended: true
-  }),
-);
+app.use(express.urlencoded({
+  limit: "500mb",
+  extended: true
+}));
 
 // TODO : complete OpenApi definition
 const oapi = openApi({
@@ -118,15 +136,11 @@ const oapi = openApi({
     version: '1.0.0',
   }
 })
-
 // OpenAPI 
 app.use('/swaggerui', oapi.swaggerui())
-
-// @ts-ignore
-app.use(cookieParser());
-app.use(express.static(path.join(import.meta.dirname, 'public')));
-
 // TODO : IMPORTANT - do not forget to set origin 
+
+
 app.all("/*splat", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", process.env.ORIGIN ? process.env.ORIGIN : "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -138,17 +152,20 @@ app.all("/*splat", (req, res, next) => {
   }
 });
 
-const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  log.debug(`Got ${req.url} - ${new Date(Date.now()).toLocaleDateString("fr-FR")}`);
-  next();
-}
-
-
+/**
+ * Load unprotected routes
+ */
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
+// enable JWT protection on all route starting with /api
+app.use("/api/*wildcard", passport.authenticate("jwt", { session: true })); 
 
+/**
+ * Load models & mount protected API endpoints
+ */
 await getModels(loggerMiddleware);
+
 
 // catch 404 and forward to error handler
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -197,12 +214,15 @@ function normalizePort(endpoint: string) {
   return false;
 }
 
+
+
 /**
  * Event listener for HTTP server "error" event.
  */
 function onError(error: HttpError) {
   if (error.syscall !== 'listen') {
     throw error;
+    // err(error.message);
   }
 
   const bind = typeof port === 'string'
@@ -243,19 +263,19 @@ function onListening() {
   else console.log("Listening ...")
 }
 
-async function getModels(...middlewares : MiddleWare[]) {
+async function getModels(...middlewares: MiddleWare[]) {
   const modelFolder = path.join(import.meta.dirname, "models");
   const entries = await fs.readdir(modelFolder, { withFileTypes: true, recursive: true });
   const files = entries.filter(e => e.isFile());
-  
+
   for await (const file of files) {
     const module = await import(path.join(file.parentPath, file.name));
     const modelName = file.name.slice(0, -3);
     log.debug("Importing : " + modelName);
-    
+
+
     const model = mongoose.model(modelName, module.default);
     const controller = createCRUDController(modelName);
-    const endpoint = `/api/${modelName}`
 
     app.post(controller.create.path, ...middlewares, controller.create.handler);
     app.get(controller.read.path, ...middlewares, controller.read.handler);
@@ -263,6 +283,8 @@ async function getModels(...middlewares : MiddleWare[]) {
     app.delete(controller.delete.path, ...middlewares, controller.delete.handler);
     app.put(controller.update.path, ...middlewares, controller.update.handler);
 
+    // exported as controller maps
+    controllers.set(modelName, model)
   }
 
   displayRouterLayer(app.router.stack)
@@ -270,8 +292,12 @@ async function getModels(...middlewares : MiddleWare[]) {
 
 
 
-
-function logMethod(methods) {
+/**
+ * 
+ * @param methods {Methods}
+ * @returns {string}
+ */
+function logMethod(methods: Methods) {
   const { get, post, delete: remove, put } = methods;
 
   if (get) return "GET";
@@ -281,14 +307,18 @@ function logMethod(methods) {
 
 }
 
-function displayRouterLayer(layers) {
+/**
+ * @returns {void}
+ * @param layers {IRouter} 
+ */
+function displayRouterLayer(layers: IRouter['stack']) {
   for (const layer of layers) {
-    const { route: { methods, path, stack } = {} } = layer
+    // @ts-ignore
+    const { route: { methods, path } = {} } = layer
     if (!methods) continue;
     console.log(`${logMethod(methods)} ${path}`);
   }
 }
-
 
 
 if (typeof process.env.MAX_STACK_TRACE !== "undefined" && isNumber(parseInt(process.env.MAX_STACK_TRACE))) {

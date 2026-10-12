@@ -27,5 +27,4 @@ const schema = new mongoose.Schema({
     timestamps: true
 });
 
-// export default mongoose.model('Exercise', schema);
 export default schema;
