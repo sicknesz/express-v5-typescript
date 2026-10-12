@@ -1,0 +1,12 @@
+{
+  "permission": {
+    "allow-fs-read": ["."],
+    "allow-fs-write": ["./public/uploads/*"],
+    "allow-child-process": true,
+    "allow-worker": true,
+    "allow-net": true,
+    "allow-addons": false,
+    "allow-ffi": false,
+    "allow-openssl-store": false
+  }
+}

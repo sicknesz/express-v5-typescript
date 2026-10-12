@@ -7,7 +7,7 @@ export default defineConfig({
     include: ['src/__tests__/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/app.ts', 'src/server.ts', 'src/routes/**/*.ts', 'src/crypto/**/*.ts'],
+      include: ['src/app.ts', 'src/server.ts', 'src/routes/**/*.ts', 'src/crypto/**/*.ts', 'src/config/**/*.ts', 'src/controllers/**/*.ts'],
     },
     // Increase timeout for crypto operations (PBKDF2 is slow by design)
     testTimeout: 30_000,

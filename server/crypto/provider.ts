@@ -40,26 +40,34 @@ export async function encryptFile(inputFilename: string, outputFilename: string,
 
   cipher.setAAD(header);
 
-  await pipeline(
-    createReadStream(inputFilename),
-    cipher,
-    async function* (source) {
-      yield header;                                     // header (version)
-      for await (const chunk of source) yield chunk;    // content 
-      yield cipher.getAuthTag();                        // auth tag      
-    },
-    createWriteStream(outputFilename),
-    { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
-  );
+  try {
+    await pipeline(
+      createReadStream(inputFilename),
+      cipher,
+      async function* (source) {
+        yield header;                                     // header (version)
+        for await (const chunk of source) yield chunk;    // content 
+        yield cipher.getAuthTag();                        // auth tag      
+      },
+      createWriteStream(outputFilename),
+      { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
+    );
+  }
+  catch (err) {
+    await rm(outputFilename, { force: true });
+    throw err;
+  }
 }
 
-export async function decryptFile(src: string, dest: string, masterkey: string, timeoutMs: number, callerSignal: AbortSignal) {
-  const { size } = await stat(src);
-  if (size <= MIN_FILE_SIZE) throw new Error('Invalid encrypted file');
+export async function decryptFile(inputFilename: string, outputFilename: string, masterkey: string, timeoutMs: number, callerSignal: AbortSignal) {
+  const { size } = await stat(inputFilename);
+  if (size <= MIN_FILE_SIZE) {
+    throw new Error('Invalid encrypted file');
+  }
 
   const tagOffset = size - TAG_LEN;
 
-  const fileHandle = await open(src, 'r');
+  const fileHandle = await open(inputFilename, 'r');
   let header: Buffer;
   let tag: Buffer;
   try {
@@ -80,15 +88,15 @@ export async function decryptFile(src: string, dest: string, masterkey: string, 
   decipher.setAAD(header);
   decipher.setAuthTag(tag);
 
-  const tmp = `${dest}.tmp`;
+  const tmp = `${outputFilename}.tmp`;
   try {
     await pipeline(
-      createReadStream(src, { start: HEADER_LEN, end: tagOffset - LAST_BYTE }),
+      createReadStream(inputFilename, { start: HEADER_LEN, end: tagOffset - LAST_BYTE }),
       decipher,
       createWriteStream(tmp),
       { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
     );
-    await rename(tmp, dest); // seulement si l'authentification a réussi
+    await rename(tmp, outputFilename); // seulement si l'authentification a réussi
   } catch (err) {
     await rm(tmp, { force: true });
     throw err;

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import usersRouter from '../../routes/users.ts';
+import usersRouter from '../../routes/sandbox.ts';
 
 /**
  * Tests for GET /users route defined in routes/users.ts
