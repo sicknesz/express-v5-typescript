@@ -3,13 +3,13 @@ import express from 'express';
 import path from 'path';
 import cors from "cors";
 import cookieParser from 'cookie-parser';
-import session from "cookie-session";
+import session from "express-session";
 import logger from 'morgan';
 import bunyan from 'bunyan';
 import { report } from "node:process";
 import fs from "node:fs/promises"
 import mongoose from "mongoose";
-
+import bodyParser from "body-parser"
 import dotenv from "dotenv"
 // @ts-ignore
 import openApi from '@wesleytodd/openapi';
@@ -22,10 +22,11 @@ import usersRouter from "./routes/sandbox.ts"
 import initWebsocket from "./websockets.ts";
 import { initPassport } from "./strategy/auth.ts"
 import createCRUDController from "./controllers/createCrudController.ts"
+import { connect } from "./database.ts"
 
 import type { Model, Schema } from "mongoose"
 import type { Express, IRouter, Request, Response, NextFunction } from "express";
-
+import { AuthController } from "./controllers/authController.ts";
 
 type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
@@ -75,10 +76,11 @@ const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
  * Get port from environment and store in Express.
  */
 const port = normalizePort(process.env.PORT || '3000');
-const server = app.listen(port);
-
-server.on('error', onError);
-server.on('listening', onListening);
+const server = app.listen(port, async () => {
+  log.debug(`listening on port ${port}`);
+  const client = await connect(app);
+  log.debug(`Connected to database ${client.connection.host} ${client.connection.name}`)
+});
 
 /**
  * Initialize websocket streams/events handlers 
@@ -95,32 +97,26 @@ io.on("log:request", (data: string) => {
 app.set('port', port);
 app.set("socket.io", io);
 
-log.debug("[Application]: server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
+log.debug("server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
-const passport = initPassport()
-if (!passport) {
-  throw new Error("Passport not initialized")
-};
+app.use(express.json({ limit: "500mb" }));
+app.use(bodyParser.json());
 
+
+// TODO : fix cookie/session/token mismatch/mixup
 app.use(cookieParser());
 app.use(session({
-  secret: process.env.JWT_SECRET || "secret",
-  name: "CookieSession",
-  maxAge: ONE_YEAR,
-  domain: process.env.ORIGIN,
-  httpOnly: true,
-  sameSite: "strict",
-  secure: false,
+  secret: process.env.JWT_SECRET || "sercet",
+  resave: true,
+  saveUninitialized: true
 }));
-app.use(passport.initialize());
-app.use(passport.session());
 
 // view engine setup
 app.set('views', path.join(import.meta.dirname, 'views'));
 app.set('view engine', 'jade');
 app.use(logger('dev'));
 
-app.use(express.json());
+
 app.use(express.urlencoded({ extended: false }));
 app.use(favicon(path.join(import.meta.dirname, "public", "favicon.ico")));
 app.use(express.static(path.join(import.meta.dirname, 'public')));
@@ -142,6 +138,14 @@ app.use(express.urlencoded({
   extended: true
 }));
 
+const passport = initPassport()
+if (!passport) {
+  throw new Error("Passport not initialized")
+};
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 // TODO : complete OpenApi definition
 const oapi = openApi({
   openapi: '3.0.0',
@@ -152,7 +156,7 @@ const oapi = openApi({
   }
 })
 // OpenAPI 
-app.use('/swaggerui', oapi.swaggerui())
+app.use('/docs', oapi.swaggerui())
 // TODO : IMPORTANT - do not forget to set origin 
 
 
@@ -173,9 +177,21 @@ app.all("/*splat", (req, res, next) => {
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
-// enable JWT protection on all route starting with /api
-app.use("/api/*wildcard", passport.authenticate("jwt", { session: true }));
+// app.use("/api/auth/login", AuthController.login);
+const router = express.Router();
 
+router.post("/auth/signup", (req, res) => {
+  return AuthController.signup(req, res);
+});
+
+router.post("/auth/login", (req, res) => {
+  return AuthController.login(req, res);
+});
+
+app.use("/", router);
+
+// enable JWT protection on all route starting with /api
+app.use("/api/*wildcard", passport.authenticate("jwt", { session: false }));
 
 await getModels(loggerMiddleware);
 
@@ -323,7 +339,7 @@ if (report.reportOnUncaughtException) {
   // Catch : uncaught exception callback
   process.setUncaughtExceptionCaptureCallback((err: unknown) => {
     if (err instanceof Error) {
-      log.error(`[Application]: Capture Uncaught Exception : ${err.message}, Writing nodeJS report to disk, send an email to developpers`);
+      log.error(`Capture Uncaught Exception : ${err.message}, Writing nodeJS report to disk, send an email to developpers`);
     }
   });
 }
@@ -331,15 +347,15 @@ if (report.reportOnUncaughtException) {
 
 // set signal handlers
 process.on("SIGTERM", () => {
-  log.warn("[Application]: Got SIGTERM");
+  log.warn("Got SIGTERM");
 });
 /*
 process.on("SIGINT", () => {
-  log.warn("[Application]: Got SIGINT");
+  log.warn("Got SIGINT");
 });
 */
 // process.on("SIGKILL", () => {
-//   log.warn("[Application]: Got SIGKILL");
+//   log.warn("Got SIGKILL");
 // });
 
 

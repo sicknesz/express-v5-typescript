@@ -10,6 +10,24 @@ type AuthenticateSuccess = { user: IAccountDocument, info: object };
 type LoginSuccess = { user: IAccountDocument, token: string, error: null };
 type Failure<E extends Error> = { user: null, token: null, error: E };
 
+function authenticateAsync(req: Request, strategy: string, options = {}): Promise<AuthenticateSuccess | Failure<Error>> {
+  return new Promise((resolve, reject) => {
+
+    const callback = (err: Error, user: IAccountDocument, info = {}) => {
+      if (err) {
+        reject(err);
+      }
+      if (!user) {
+        reject(new Error("bad"));
+      }
+      resolve({ user, info });
+    }
+
+    passport.authenticate(strategy, options, callback)(req);
+  });
+}
+
+
 async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<LoginSuccess | Failure<Error>> {
   return new Promise((resolve, reject) => {
     req.login(user, async (err) => {
@@ -32,24 +50,6 @@ async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<
   });
 }
 
-function authenticateAsync(req: Request, strategy: string, options = {}): Promise<AuthenticateSuccess | Failure<Error>> {
-  return new Promise((resolve, reject) => {
-
-    const callback = (err: Error, user: IAccountDocument, info = {}) => {
-      if (err) {
-        reject(err);
-      }
-      if (!user) {
-        reject(new Error("bad"));
-      }
-      resolve({ user, info });
-    }
-
-    passport.authenticate(strategy, options, callback)(req);
-  });
-}
-
-
 export class AuthController {
   static async login(req: Request, res: Response) {
     const {
@@ -57,11 +57,18 @@ export class AuthController {
     } = req;
 
     log.warn(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
+    // const authenticator = await passport.authenticate("local", { session: false });
+    // if (!authenticator) {
+    //   return res.json({ success: false, error: Error("User not found") });
+    // }
+
+    // const account = authenticator(req);
     const auth = await authenticateAsync(req, "local", {});
     if (!auth || !auth.user) {
       return res.json({ success: false, error: Error("User not found") });
     }
     const { user } = auth;
+
     const credential = await logAndReturnToken(req, user);
     if (credential.error) {
       return res.json({ success: false, error: Error("User not found") }); // you can specify password incorrect but its a leak

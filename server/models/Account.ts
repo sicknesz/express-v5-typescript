@@ -1,5 +1,4 @@
 import { Schema, model } from "mongoose";
-import type { ObjectId } from "mongoose";
 import type { PassportLocalMongooseDocument, PassportLocalMongooseModel } from "passport-local-mongoose";
 import passportLocalMongoose from "passport-local-mongoose";
 
@@ -7,6 +6,7 @@ export const ROLES = ["ROLE_ADMIN", "ROLE_USER"] as const;
 export type Role = typeof ROLES[number];
 
 export interface IAccount {
+    // username: string;
     email: string;
     role: Role;
 }

@@ -7,8 +7,32 @@ import { createGzip } from "node:zlib";
 import { createReadStream, createWriteStream } from "node:fs";
 
 import type { Context, } from "node:vm"
+import jwt from "jsonwebtoken"
+
+import type { IAccountDocument } from "../models/Account.ts"
 
 const readFilePermission = 'fs.read';
+
+export async function generateToken(payload: object, expiresIn: jwt.SignOptions['expiresIn'] = "7d") {
+  const token = jwt.sign(payload, (process.env.JWT_SECRET || "secret") as string, { expiresIn } as jwt.SignOptions);
+  return token;
+}
+
+export function getCleanUser(user: IAccountDocument) {
+  const u = user.toJSON();
+
+  const {
+    salt,
+    hash,
+    password,
+    active,
+    resetPasswordToken,
+    resetPasswordExpiration,
+    ...cleanUser
+  } = u;
+
+  return cleanUser;
+}
 
 /**
  * @note needs node to be started with --permission 
