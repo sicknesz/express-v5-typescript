@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["error", { "ignoreRestSiblings": true }],    
+  },
+  "env": {
+    "builtin": true
+  }
+}

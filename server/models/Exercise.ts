@@ -1,6 +1,6 @@
 // const mongoose = require('mongoose');
-import mongoose from "mongoose";
-import TestsSchema from "./Tests.ts"
+import mongoose, { model } from "mongoose";
+import { Test } from "./Test.ts"
 
 const schema = new mongoose.Schema({
     name: {
@@ -21,10 +21,10 @@ const schema = new mongoose.Schema({
     testSnippets: {
         type: String,
     },
-    tests: [TestsSchema]
+    tests: [Test.schema]
 
 }, {
     timestamps: true
 });
 
-export default schema;
+export const Exercise = model('Exercise', schema);

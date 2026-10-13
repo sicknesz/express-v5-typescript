@@ -71,17 +71,31 @@ export async function virtualizeSource(sourceCode: string, context: Context, tim
   })
 
   // wait until timeout is reached
-  await new Promise((resolve, reject) => setTimeout(resolve, timeoutMs))
+  await new Promise((resolve) => setTimeout(resolve, timeoutMs))
 
   return logs;
 }
 
 
 export async function compressFile(inputFilename: string, outputFilename: string, useCompression: boolean = true) {
+
+  if (useCompression) {
+    return pipeline(
+      createReadStream(inputFilename),
+      createGzip(),
+      createWriteStream(outputFilename + ".gz"), (err) => {
+        if (err) {
+          console.error("Pipeline failed", err);
+        } else {
+          console.log("Pipeline succeeded");
+        }
+      }
+    );
+  }
+
   return pipeline(
     createReadStream(inputFilename),
-    createGzip(),
-    createWriteStream(outputFilename + ".gz"), (err) => {
+    createWriteStream(outputFilename), (err) => {
       if (err) {
         console.error("Pipeline failed", err);
       } else {

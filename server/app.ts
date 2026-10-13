@@ -3,49 +3,35 @@ import express from 'express';
 import path from 'path';
 import cors from "cors";
 import cookieParser from 'cookie-parser';
+import session from "cookie-session";
 import logger from 'morgan';
-import bunyan, { RotatingFileStream } from 'bunyan';
+import bunyan from 'bunyan';
 import { report } from "node:process";
 import fs from "node:fs/promises"
 import mongoose from "mongoose";
-import passport from "passport";
+
 import dotenv from "dotenv"
 // @ts-ignore
 import openApi from '@wesleytodd/openapi';
 import favicon from "serve-favicon";
 import helmet from "helmet"
 
-import {
-  ok,
-  Ok,
-  err,
-  Err,
-  Result,
-  okAsync,
-  errAsync,
-  ResultAsync,
-  fromAsyncThrowable,
-  fromThrowable,
-  fromPromise,
-  fromSafePromise,
-  safeTry,
-} from 'neverthrow'
-
 // Local imports
 import indexRouter from "./routes/index.ts"
 import usersRouter from "./routes/sandbox.ts"
 import initWebsocket from "./websockets.ts";
+import { initPassport } from "./strategy/auth.ts"
 import createCRUDController from "./controllers/createCrudController.ts"
 
-import type { Model } from "mongoose"
+import type { Model, Schema } from "mongoose"
 import type { Express, IRouter, Request, Response, NextFunction } from "express";
 
 
 type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
-type Controller = { name: string, model: Model<any, any, any, any, any, any, any> };
+type Controller = { name: string, model: Model<any>, schema: Schema };
 
-export const controllers = new Map<string, Controller['model']>();
+export const controllers = new Map<string, Controller['schema']>()
 
 dotenv.config()
 
@@ -98,16 +84,42 @@ server.on('listening', onListening);
  * Initialize websocket streams/events handlers 
  */
 const io = initWebsocket(server);
+if (!io) {
+  throw new Error("Websocket not initialized")
+}
+
+io.on("log:request", (data: string) => {
+  log.debug("[Websocket]:", data)
+})
+
 app.set('port', port);
 app.set("socket.io", io);
 
 log.debug("[Application]: server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
+const passport = initPassport()
+if (!passport) {
+  throw new Error("Passport not initialized")
+};
+
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.JWT_SECRET || "secret",
+  name: "CookieSession",
+  maxAge: ONE_YEAR,
+  domain: process.env.ORIGIN,
+  httpOnly: true,
+  sameSite: "strict",
+  secure: false,
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
 // view engine setup
 app.set('views', path.join(import.meta.dirname, 'views'));
 app.set('view engine', 'jade');
 app.use(logger('dev'));
-app.use(cookieParser());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(favicon(path.join(import.meta.dirname, "public", "favicon.ico")));
@@ -121,7 +133,10 @@ app.use(helmet.hsts({
   maxAge: ONE_YEAR,
   includeSubDomains: true
 }));
-app.use(helmet.hidePoweredBy());
+app.use(helmet.xPoweredBy());
+
+app.use(helmet.noSniff());
+
 app.use(express.urlencoded({
   limit: "500mb",
   extended: true
@@ -159,11 +174,9 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
 // enable JWT protection on all route starting with /api
-app.use("/api/*wildcard", passport.authenticate("jwt", { session: true })); 
+app.use("/api/*wildcard", passport.authenticate("jwt", { session: true }));
 
-/**
- * Load models & mount protected API endpoints
- */
+
 await getModels(loggerMiddleware);
 
 
@@ -184,14 +197,6 @@ app.use((err: HttpError, req: Request, res: Response, next: NextFunction) => {
 });
 
 
-function reportCrash() {
-  const reportString = JSON.stringify(report.getReport(), null, 2);
-  report.writeReport();
-  log.error(reportString);
-
-  // better let an application crash and restart that maintain execution and get unexpected behaviors
-  process.exit(-1);
-}
 
 // set exception handler
 function isNumber(value: number): value is number {
@@ -214,11 +219,6 @@ function normalizePort(endpoint: string) {
   return false;
 }
 
-
-
-/**
- * Event listener for HTTP server "error" event.
- */
 function onError(error: HttpError) {
   if (error.syscall !== 'listen') {
     throw error;
@@ -282,21 +282,12 @@ async function getModels(...middlewares: MiddleWare[]) {
     app.get(controller.readAll.path, ...middlewares, controller.readAll.handler);
     app.delete(controller.delete.path, ...middlewares, controller.delete.handler);
     app.put(controller.update.path, ...middlewares, controller.update.handler);
-
-    // exported as controller maps
-    controllers.set(modelName, model)
   }
 
   displayRouterLayer(app.router.stack)
 }
 
 
-
-/**
- * 
- * @param methods {Methods}
- * @returns {string}
- */
 function logMethod(methods: Methods) {
   const { get, post, delete: remove, put } = methods;
 
@@ -307,10 +298,6 @@ function logMethod(methods: Methods) {
 
 }
 
-/**
- * @returns {void}
- * @param layers {IRouter} 
- */
 function displayRouterLayer(layers: IRouter['stack']) {
   for (const layer of layers) {
     // @ts-ignore
@@ -329,7 +316,7 @@ if (typeof process.env.MAX_STACK_TRACE !== "undefined" && isNumber(parseInt(proc
 if (report.reportOnUncaughtException) {
 
   // Handle unhandled promise rejection 
-  process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
+  process.on("unhandledRejection", (reason: unknown) => {
     log.error("Unhandled Rejection : " + reason);
   });
 
