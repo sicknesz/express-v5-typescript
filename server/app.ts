@@ -186,7 +186,7 @@ app.all("/*splat", (req, res, next) => {
  * Load unprotected routes
  */
 app.use('/', indexRouter);
-app.post("/auth", authRouter);
+app.use("/auth", authRouter);
 
 // Clean prefix match (No wildcards needed!)
 app.use("/api", passport.authenticate("jwt", { session: false }));

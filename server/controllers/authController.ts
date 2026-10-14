@@ -1,7 +1,7 @@
 
 import type { IAccountDocument } from "../models/Account.ts"
 import { Account } from "../models/Account.ts"
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { log } from "../app.ts"
 import passport from "passport"
 import { generateToken, getCleanUser } from "../utils/utils.ts"
@@ -51,7 +51,7 @@ async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<
 }
 
 export class AuthController {
-  static async login(req: Request, res: Response) {
+  static async login(req: Request, res: Response, next: NextFunction) {
     const { body: { username } } = req;
 
     log.warn(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
@@ -61,6 +61,18 @@ export class AuthController {
       return res.json({ success: false, error: Error("Authentication failed") });
     }
     const { user } = auth;
+
+
+    // const authenticate = await passport.authenticate("local", {});
+    // if (typeof authenticate !== 'function') {
+    //   return res.json({ success: false, error: Error("Authentication failed") });
+    // }
+    // const auth = await authenticate(req)
+    // if (!auth) {
+    //   return res.json({ success: false, error: Error("Authentication failed") });
+    // }
+    // const { user } = auth;
+
 
     const credential = await logAndReturnToken(req, user);
     if (credential.error) {
