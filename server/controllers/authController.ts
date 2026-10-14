@@ -18,7 +18,7 @@ function authenticateAsync(req: Request, strategy: string, options = {}): Promis
         reject(err);
       }
       if (!user) {
-        reject(new Error("bad"));
+        reject(new Error("Authentication failed"));
       }
       resolve({ user, info });
     }
@@ -52,26 +52,19 @@ async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<
 
 export class AuthController {
   static async login(req: Request, res: Response) {
-    const {
-      body: { username },
-    } = req;
+    const { body: { username } } = req;
 
     log.warn(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
-    // const authenticator = await passport.authenticate("local", { session: false });
-    // if (!authenticator) {
-    //   return res.json({ success: false, error: Error("User not found") });
-    // }
 
-    // const account = authenticator(req);
     const auth = await authenticateAsync(req, "local", {});
     if (!auth || !auth.user) {
-      return res.json({ success: false, error: Error("User not found") });
+      return res.json({ success: false, error: Error("Authentication failed") });
     }
     const { user } = auth;
 
     const credential = await logAndReturnToken(req, user);
     if (credential.error) {
-      return res.json({ success: false, error: Error("User not found") }); // you can specify password incorrect but its a leak
+      return res.json({ success: false, error: Error("Authentication failed") }); // you can specify password incorrect but its a leak
     }
     return res.json({ success: true, ...credential });
   }
@@ -80,5 +73,15 @@ export class AuthController {
     const newUser = new Account({ username: req.body.email, email: req.body.email, role: "ROLE_USER" });
     const user = await Account.register(newUser, req.body.password);
     return res.json({ success: true, user: getCleanUser(user) });
+  }
+
+  static async logout(req: Request, res: Response) {
+    req.logOut({ keepSessionInfo: false }, (err: Error) => {
+      if (err) {
+        return res.json({ success: false, error: err });
+      }
+    });
+
+    return res.json({ success: true, message: "user logged out" });
   }
 }

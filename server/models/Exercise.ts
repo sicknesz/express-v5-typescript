@@ -21,7 +21,10 @@ const schema = new mongoose.Schema({
     testSnippets: {
         type: String,
     },
-    tests: [Test.schema]
+    tests: [Test.schema],
+    publisherId: {
+        type: String
+    }
 
 }, {
     timestamps: true

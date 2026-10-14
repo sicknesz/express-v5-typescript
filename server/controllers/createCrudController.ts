@@ -1,9 +1,11 @@
-
+import express from 'express';
 import mongoose from "mongoose"
 import type { Request, Response } from "express"
 import type { Model } from "mongoose"
+import type { IAccountDocument } from "../models/Account.ts";
 
-type Entity = Model<any, any, any, any, any, any >;
+type Resource = IAccountDocument;
+type Entity = Model<Resource>;
 
 // FIXME : any
 const create = async (model: Entity, req: Request, res: Response) => {
@@ -128,7 +130,7 @@ const remove = async (model: Entity, req: Request, res: Response) => {
 function createCRUDController(modelName: string) {
   const model = mongoose.model(modelName);
 
-  return {
+  const methods = {
     create: { path: `/api/${modelName.toLocaleLowerCase()}/`, handler: (req: Request, res: Response) => create(model, req, res) },
     read: { path: `/api/${modelName.toLocaleLowerCase()}/:id`, handler: (req: Request, res: Response) => read(model, req, res) },
     readAll: { path: `/api/${modelName.toLocaleLowerCase()}/`, handler: (req: Request, res: Response) => readAll(model, req, res) },
@@ -136,6 +138,10 @@ function createCRUDController(modelName: string) {
     delete: { path: `/api/${modelName.toLocaleLowerCase()}/:id`, handler: (req: Request, res: Response) => remove(model, req, res) },
   }
 
+  return methods
+
 }
+
+
 
 export default createCRUDController

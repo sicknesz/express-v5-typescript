@@ -12,27 +12,28 @@ import mongoose from "mongoose";
 import bodyParser from "body-parser"
 import dotenv from "dotenv"
 // @ts-ignore
-import openApi from '@wesleytodd/openapi';
+// import openApi from '@wesleytodd/openapi';
 import favicon from "serve-favicon";
 import helmet from "helmet"
+import { apiReference } from '@scalar/express-api-reference'
 
 // Local imports
 import indexRouter from "./routes/index.ts"
-import usersRouter from "./routes/sandbox.ts"
+import sandboxRouter from "./routes/sandbox.ts"
+import authRouter from "./routes/auth.ts"
 import initWebsocket from "./websockets.ts";
-import { initPassport } from "./strategy/auth.ts"
 import createCRUDController from "./controllers/createCrudController.ts"
+// import { AuthController } from "./controllers/authController.ts";
+import { initPassport } from "./strategy/auth.ts"
 import { connect } from "./database.ts"
 
-import type { Model, Schema } from "mongoose"
-import type { Express, IRouter, Request, Response, NextFunction } from "express";
-import { AuthController } from "./controllers/authController.ts";
 
+// Types import
+import type { Express, IRouter, Request, Response, NextFunction } from "express";
+
+// Types definition
 type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
-type Controller = { name: string, model: Model<any>, schema: Schema };
-
-export const controllers = new Map<string, Controller['schema']>()
 
 dotenv.config()
 
@@ -79,7 +80,7 @@ const port = normalizePort(process.env.PORT || '3000');
 const server = app.listen(port, async () => {
   log.debug(`listening on port ${port}`);
   const client = await connect(app);
-  log.debug(`Connected to database ${client.connection.host} ${client.connection.name}`)
+  log.debug(`Connected to database ${client.connection.host} ${client.connection.name}`);
 });
 
 /**
@@ -101,7 +102,6 @@ log.debug("server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
 app.use(express.json({ limit: "500mb" }));
 app.use(bodyParser.json());
-
 
 // TODO : fix cookie/session/token mismatch/mixup
 app.use(cookieParser());
@@ -146,20 +146,29 @@ if (!passport) {
 app.use(passport.initialize());
 app.use(passport.session());
 
+
 // TODO : complete OpenApi definition
-const oapi = openApi({
-  openapi: '3.0.0',
-  info: {
-    title: 'Express Typescript Application',
-    description: 'Generated docs from an Express api',
-    version: '1.0.0',
-  }
-})
+// const oapi = openApi({
+//   openapi: '3.0.0',
+//   info: {
+//     title: 'Express Typescript Application',
+//     description: 'Generated docs from an Express api',
+//     version: '1.0.0',
+//   }
+// })
 // OpenAPI 
-app.use('/docs', oapi.swaggerui())
+// app.use('/docs', oapi.swaggerui())
+
+app.use(
+  '/docs',
+  apiReference({
+    // Put your OpenAPI url here:
+    theme: 'purple',
+    url: '/openapi.json'
+  }),
+)
+
 // TODO : IMPORTANT - do not forget to set origin 
-
-
 app.all("/*splat", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", process.env.ORIGIN ? process.env.ORIGIN : "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -171,30 +180,20 @@ app.all("/*splat", (req, res, next) => {
   }
 });
 
+// app.options('*', cors());
+
 /**
  * Load unprotected routes
  */
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.post("/auth", authRouter);
 
-// app.use("/api/auth/login", AuthController.login);
-const router = express.Router();
+// Clean prefix match (No wildcards needed!)
+app.use("/api", passport.authenticate("jwt", { session: false }));
+app.use('/api/sandbox', sandboxRouter);
 
-router.post("/auth/signup", (req, res) => {
-  return AuthController.signup(req, res);
-});
-
-router.post("/auth/login", (req, res) => {
-  return AuthController.login(req, res);
-});
-
-app.use("/", router);
-
-// enable JWT protection on all route starting with /api
-app.use("/api/*wildcard", passport.authenticate("jwt", { session: false }));
 
 await getModels(loggerMiddleware);
-
 
 // catch 404 and forward to error handler
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -235,49 +234,7 @@ function normalizePort(endpoint: string) {
   return false;
 }
 
-function onError(error: HttpError) {
-  if (error.syscall !== 'listen') {
-    throw error;
-    // err(error.message);
-  }
 
-  const bind = typeof port === 'string'
-    ? 'Pipe ' + port
-    : 'Port ' + port;
-
-  // handle specific listen errors with friendly messages
-  switch (error.code) {
-    case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
-}
-
-/**
- * Event listener for HTTP server "listening" event.
- */
-function notNull(addr: unknown): addr is null {
-  return addr !== null;
-}
-
-function onListening() {
-  const addr = server.address();
-
-  if (notNull(addr)) {
-    const bind = typeof port === 'string'
-      ? 'Pipe ' + port
-      : 'Port ' + port;
-    log.info('Listening on ' + bind);
-  }
-  else console.log("Listening ...")
-}
 
 async function getModels(...middlewares: MiddleWare[]) {
   const modelFolder = path.join(import.meta.dirname, "models");
@@ -288,16 +245,24 @@ async function getModels(...middlewares: MiddleWare[]) {
     const module = await import(path.join(file.parentPath, file.name));
     const modelName = file.name.slice(0, -3);
     log.debug("Importing : " + modelName);
-
-
-    const model = mongoose.model(modelName, module.default);
+    // needed : compile model
+    mongoose.model(modelName, module.default);
     const controller = createCRUDController(modelName);
+    const {
+      create: { path: createPath, handler: createHandler },
+      read: { path: readPath, handler: readHandler },
+      readAll: { path: readAllPath, handler: readAllHandler },
+      delete: { path: deletePath, handler: deleteHandler },
+      update: { path: updatePath, handler: updateHandler }
+    } = controller;
 
-    app.post(controller.create.path, ...middlewares, controller.create.handler);
-    app.get(controller.read.path, ...middlewares, controller.read.handler);
-    app.get(controller.readAll.path, ...middlewares, controller.readAll.handler);
-    app.delete(controller.delete.path, ...middlewares, controller.delete.handler);
-    app.put(controller.update.path, ...middlewares, controller.update.handler);
+    const router = app;
+
+    router.post(createPath, ...middlewares, createHandler);
+    router.get(readPath, ...middlewares, readHandler);
+    router.get(readAllPath, ...middlewares, readAllHandler);
+    router.delete(deletePath, ...middlewares, deleteHandler);
+    router.put(updatePath, ...middlewares, updateHandler);
   }
 
   displayRouterLayer(app.router.stack)

@@ -12,7 +12,7 @@ dotenv.config();
 const localLoginStrategy = new LocalStrategy(Account.authenticate());
 
 const tokenExtractor = function (req: Request) {
-  return req.body.token || req.query.token || req.headers.authorization || req.headers.bearer;
+  return req?.body?.token || req?.query?.token || req.headers.authorization || req.headers.bearer;
 };
 
 const JwtStrategy = passportJWT.Strategy;
@@ -23,22 +23,21 @@ const jwtOptions: passportJWT.StrategyOptionsWithRequest = {
 };
 
 
-const jwtLoginStrategy = new JwtStrategy(jwtOptions, async (req: Request, payload: any, done: passportJWT.VerifiedCallback) => {
+const jwtLoginStrategy = new JwtStrategy(jwtOptions, async (_: Request, payload: any, done: passportJWT.VerifiedCallback) => {
   log.warn(`[JWT]: Stragegy::verify token`, payload)
 
   const user = await Account.findById(payload._id);
   if (user) {
-    done(null, user);
+    return done(null, user);
   }
-  else
-    done(null, false);
-});
 
+  done(null, false);
+});
 
 
 function initPassport() {
 
-  // passport.use(Account.createStrategy());
+  passport.use(Account.createStrategy());
   passport.use(jwtLoginStrategy);   // enable passport JWT strategy
   passport.use(localLoginStrategy); // enable passport Local strategy
 

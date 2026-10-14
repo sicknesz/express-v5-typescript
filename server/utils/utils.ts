@@ -61,45 +61,6 @@ export async function readThenProtect(parentFolderPath: string, filename: string
 }
 
 
-export async function virtualizeSource(sourceCode: string, context: Context, timeoutMs: number) {
-
-  const deadline = Date.now() + timeoutMs;
-
-  const logs: unknown[] = [];
-
-  const recordConsole = (...args: unknown[]) => {
-    if (Date.now() > deadline) return;
-    console.log(...args);
-    logs.push(...args);
-  }
-
-  const contextified = vm.createContext({
-    ...context,
-    console: {
-      log: recordConsole,
-      warn: recordConsole,
-      error: recordConsole,
-      infor: recordConsole
-    },
-    setImmediate: setImmediate,
-    setTimeout: setTimeout,
-    setInterval: setInterval,
-    clearImmediate: clearImmediate,
-    clearTimeout: clearTimeout,
-  });
-  const script = new Script(sourceCode);
-
-  // Gotcha point : timeout only applies to synchronous tasks 
-  script.runInContext(contextified, {
-    timeout: timeoutMs
-  })
-
-  // wait until timeout is reached
-  await new Promise((resolve) => setTimeout(resolve, timeoutMs))
-
-  return logs;
-}
-
 
 export async function compressFile(inputFilename: string, outputFilename: string, useCompression: boolean = true) {
 
