@@ -1129,6 +1129,30 @@
               }
             }
           }
+        },
+        "requestBody": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string",
+                      "default": "username"
+                    },
+                    "password": {
+                      "type": "string",
+                      "default": "password"
+                    }
+                  },
+                  "required": [
+                    "username",
+                    "password"
+                  ]
+                }
+              }
+            }          
         }
       }
     }
