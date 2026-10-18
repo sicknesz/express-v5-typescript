@@ -1,15 +1,16 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import vm, { Script } from 'node:vm';
-
+import jwt from "jsonwebtoken"
 import { pipeline } from "node:stream";
 import { createGzip } from "node:zlib";
 import { createReadStream, createWriteStream } from "node:fs";
 
-import type { Context, } from "node:vm"
-import jwt from "jsonwebtoken"
+// Types import
+import type { IAccount, IAccountDocument } from "../models/Account.ts"
+import type { IRouter } from "express";
 
-import type { IAccountDocument } from "../models/Account.ts"
+// Types definition
+type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 
 const readFilePermission = 'fs.read';
 
@@ -18,7 +19,7 @@ export async function generateToken(payload: object, expiresIn: jwt.SignOptions[
   return token;
 }
 
-export function getCleanUser(user: IAccountDocument) {
+export function getCleanUser(user: IAccountDocument): IAccount {
   const u = user.toJSON();
 
   const {
@@ -34,12 +35,7 @@ export function getCleanUser(user: IAccountDocument) {
   return cleanUser;
 }
 
-/**
- * @note needs node to be started with --permission 
- * @param parentFolderPath 
- * @param filename 
- * @returns 
- */
+
 export async function readThenProtect(parentFolderPath: string, filename: string) {
 
   if (!process.permission) {
@@ -52,7 +48,6 @@ export async function readThenProtect(parentFolderPath: string, filename: string
   }
 
   const filePath = path.join(parentFolderPath, filename);
-
   const content = await fs.readFile(filePath, 'utf8');
 
   process.permission.drop(readFilePermission, parentFolderPath);
@@ -88,6 +83,25 @@ export async function compressFile(inputFilename: string, outputFilename: string
       }
     }
   );
+}
+
+function logMethod(methods: Methods) {
+  const { get, post, delete: remove, put } = methods;
+
+  if (get) return "GET";
+  if (post) return "POST";
+  if (put) return "PUT";
+  if (remove) return "DELETE";
+
+}
+
+export function displayRouterLayer(layers: IRouter['stack']) {
+  for (const layer of layers) {
+    // @ts-ignore
+    const { route: { methods, path } = {} } = layer
+    if (!methods) continue;
+    console.log(`${logMethod(methods)} ${path}`);
+  }
 }
 
 

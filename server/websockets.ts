@@ -1,10 +1,10 @@
 import { Server as WebsocketServer } from "socket.io"
 import { log } from "./app.ts"
 import type { Server as HttpServer } from "node:http";
+import { AuthenticationError } from './errors.ts'
+import jwt from "jsonwebtoken"
 
-
-
-export default function initWebsocket(server: HttpServer) {
+export function initWebsocket(server: HttpServer) {
   /**
    * Create socket.io server.
    */
@@ -34,11 +34,14 @@ export default function initWebsocket(server: HttpServer) {
       return next(new AuthenticationError('Token required'));
     }
     try {
-      // const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      // socket.user = decoded; // Attach user info to the socket object
-      // log.debug(decoded, "[Socket.io][jwt]: socket.io client authed");
-      // next();
-    } catch (error) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
+      // socket.user = decoded; 
+      log.debug(decoded, "[Socket.io][jwt]: socket.io client authed");
+      next();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return next(error);
+      }
       socket.emit("disconnect");
       return next(new Error('Authentication error: Invalid token'));
     }

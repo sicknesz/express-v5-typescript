@@ -1,0 +1,10 @@
+{
+   "MissingPasswordError": "Password missing",
+   "AttemptTooSoonError": "Account locked. Please try again later.",
+   "TooManyAttemptsError": "This account is currently locked for 5 minutes due to too many failed attempts",
+   "UserExistsError": "Username already taken",
+   "NoSaltValueStoredError": "Salt missing, cannot authenticate",
+   "IncorrectPasswordError": "Username of password missing",
+   "IncorrectUsernameError": "Username of password missing",
+   "MissingUsernameError": "No username"
+}

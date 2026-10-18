@@ -1,9 +1,9 @@
 
-export enum DatabaseError {
-  PoolExhausted = 'PoolExhausted',
-  NotFound = 'NotFound',
-  ConnectionLost = 'ConnectionLost',
-}
+// export enum DatabaseError {
+//   PoolExhausted = 'PoolExhausted',
+//   NotFound = 'NotFound',
+//   ConnectionLost = 'ConnectionLost',
+// }
 
 export class InternalError extends Error {
   information: string;

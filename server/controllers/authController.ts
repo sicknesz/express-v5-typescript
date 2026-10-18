@@ -1,19 +1,19 @@
 
-import type { IAccountDocument } from "../models/Account.ts"
-import { Account } from "../models/Account.ts"
+import type { IAccount, IAccountDocument } from "../models/Account.ts"
+import { Account, } from "../models/Account.ts"
 import type { NextFunction, Request, Response } from "express";
 import { log } from "../app.ts"
 import passport from "passport"
 import { generateToken, getCleanUser } from "../utils/utils.ts"
 
 type AuthenticateSuccess = { user: IAccountDocument, info: object };
-type LoginSuccess = { user: IAccountDocument, token: string, error: null };
+type LoginSuccess = { user: IAccount, token: string, error: null };
 type Failure<E extends Error> = { user: null, token: null, error: E };
 
+// this auth and gets a Document (with toJSON()) from db
 function authenticateAsync(req: Request, strategy: string, options = {}): Promise<AuthenticateSuccess | Failure<Error>> {
   return new Promise((resolve, reject) => {
-
-    const callback = (err: Error, user: IAccountDocument, info = {}) => {
+    passport.authenticate(strategy, options, (err: Error, user: IAccountDocument, info = {}) => {
       if (err) {
         reject(err);
       }
@@ -21,13 +21,11 @@ function authenticateAsync(req: Request, strategy: string, options = {}): Promis
         reject(new Error("Authentication failed"));
       }
       resolve({ user, info });
-    }
-
-    passport.authenticate(strategy, options, callback)(req);
+    })(req);
   });
 }
 
-
+// this takes a IAccountDocument and return a IAccount object (POJO)
 async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<LoginSuccess | Failure<Error>> {
   return new Promise((resolve, reject) => {
     req.login(user, async (err) => {
@@ -51,7 +49,7 @@ async function logAndReturnToken(req: Request, user: IAccountDocument): Promise<
 }
 
 export class AuthController {
-  static async login(req: Request, res: Response, next: NextFunction) {
+  static async login(req: Request, res: Response/* , next: NextFunction */) {
     const { body: { username } } = req;
 
     log.warn(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
@@ -60,19 +58,8 @@ export class AuthController {
     if (!auth || !auth.user) {
       return res.json({ success: false, error: Error("Authentication failed") });
     }
+
     const { user } = auth;
-
-
-    // const authenticate = await passport.authenticate("local", {});
-    // if (typeof authenticate !== 'function') {
-    //   return res.json({ success: false, error: Error("Authentication failed") });
-    // }
-    // const auth = await authenticate(req)
-    // if (!auth) {
-    //   return res.json({ success: false, error: Error("Authentication failed") });
-    // }
-    // const { user } = auth;
-
 
     const credential = await logAndReturnToken(req, user);
     if (credential.error) {

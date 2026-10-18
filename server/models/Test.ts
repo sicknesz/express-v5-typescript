@@ -1,18 +1,48 @@
 // const mongoose = require('mongoose');
 import mongoose, { model } from "mongoose";
+import type { InferSchemaType, Model, Document } from 'mongoose'
 
-const schema = new mongoose.Schema({
-    name: {
-        type: String,
-    },
-    sourceCode: {
-        type: String,
-    },
-    expectedResult: {
-        type: String,
-    }
-}, {
+export interface ITest {
+  status: 'published' | 'draft' | 'unpublished' | 'moderated' | 'deleted';
+  timeoutMs: number;
+  name: string;
+  sourceCode: string,
+  expectedResult: string,
+  publisherId: string;
+}
+export interface ITestDocument extends ITest, Document { }
+export interface ITestModel extends Model<Document> { }
+
+const TestSchema = new mongoose.Schema<ITest>({
+  status: {
+    type: String,
+    enum: [
+      'published',
+      'draft',
+      'unpublished',
+      'moderated',
+      'deleted'
+    ],
+    // all new exercise starts as draft
+    default: "draft"
+  },
+  name: {
+    type: String,
+  },
+  sourceCode: {
+    type: String,
+  },
+  expectedResult: {
+    type: String,
+  },
+  publisherId: {
+    type: String
+  }
+},
+  {
     timestamps: true
-});
+  });
 
-export const Test = model('Test', schema);
+export type TestAttributes = InferSchemaType<typeof TestSchema>;
+
+export const Test = model('Test', TestSchema);

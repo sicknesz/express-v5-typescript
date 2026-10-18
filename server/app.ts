@@ -11,28 +11,24 @@ import fs from "node:fs/promises"
 import mongoose from "mongoose";
 import bodyParser from "body-parser"
 import dotenv from "dotenv"
-// @ts-ignore
-// import openApi from '@wesleytodd/openapi';
 import favicon from "serve-favicon";
 import helmet from "helmet"
 import { apiReference } from '@scalar/express-api-reference'
-
+import i18n from "i18n";
 // Local imports
 import indexRouter from "./routes/index.ts"
 import sandboxRouter from "./routes/sandbox.ts"
 import authRouter from "./routes/auth.ts"
-import initWebsocket from "./websockets.ts";
 import createCRUDController from "./controllers/createCrudController.ts"
-// import { AuthController } from "./controllers/authController.ts";
+import { initWebsocket } from "./websockets.ts";
 import { initPassport } from "./strategy/auth.ts"
 import { connect } from "./database.ts"
-
+import { displayRouterLayer } from "./utils/utils.ts"
 
 // Types import
-import type { Express, IRouter, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 
 // Types definition
-type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
 
 dotenv.config()
@@ -95,6 +91,8 @@ io.on("log:request", (data: string) => {
   log.debug("[Websocket]:", data)
 })
 
+
+app.use(i18n.init)
 app.set('port', port);
 app.set("socket.io", io);
 
@@ -211,9 +209,6 @@ app.use((err: HttpError, req: Request, res: Response, next: NextFunction) => {
   res.render('error');
 });
 
-
-
-// set exception handler
 function isNumber(value: number): value is number {
   return Number.isInteger(value);
 }
@@ -244,54 +239,50 @@ async function getModels(...middlewares: MiddleWare[]) {
   for await (const file of files) {
     const module = await import(path.join(file.parentPath, file.name));
     const modelName = file.name.slice(0, -3);
-    log.debug("Importing : " + modelName);
-    // needed : compile model
+    log.debug("Loading model : " + modelName + " and mounting CRUD router.");
+
+    // this is needed but we don't need the returned value
     mongoose.model(modelName, module.default);
     const controller = createCRUDController(modelName);
+
     const {
-      create: { path: createPath, handler: createHandler },
-      read: { path: readPath, handler: readHandler },
-      readAll: { path: readAllPath, handler: readAllHandler },
-      delete: { path: deletePath, handler: deleteHandler },
-      update: { path: updatePath, handler: updateHandler }
+      create: {
+        path: createPath,
+        handler: createHandler
+      },
+      read: {
+        path: readPath,
+        handler: readHandler
+      },
+      readAll: {
+        path: readAllPath,
+        handler: readAllHandler
+      },
+      delete: {
+        path: deletePath,
+        handler: deleteHandler
+      },
+      update: {
+        path: updatePath,
+        handler: updateHandler
+      }
     } = controller;
 
-    const router = app;
-
-    router.post(createPath, ...middlewares, createHandler);
-    router.get(readPath, ...middlewares, readHandler);
-    router.get(readAllPath, ...middlewares, readAllHandler);
-    router.delete(deletePath, ...middlewares, deleteHandler);
-    router.put(updatePath, ...middlewares, updateHandler);
+    app.post(createPath, ...middlewares, createHandler);
+    app.get(readPath, ...middlewares, readHandler);
+    app.get(readAllPath, ...middlewares, readAllHandler);
+    app.delete(deletePath, ...middlewares, deleteHandler);
+    app.put(updatePath, ...middlewares, updateHandler);
   }
 
   displayRouterLayer(app.router.stack)
 }
 
 
-function logMethod(methods: Methods) {
-  const { get, post, delete: remove, put } = methods;
-
-  if (get) return "GET";
-  if (post) return "POST";
-  if (put) return "PUT";
-  if (remove) return "DELETE";
-
-}
-
-function displayRouterLayer(layers: IRouter['stack']) {
-  for (const layer of layers) {
-    // @ts-ignore
-    const { route: { methods, path } = {} } = layer
-    if (!methods) continue;
-    console.log(`${logMethod(methods)} ${path}`);
-  }
-}
-
 
 if (typeof process.env.MAX_STACK_TRACE !== "undefined" && isNumber(parseInt(process.env.MAX_STACK_TRACE))) {
-  Error.stackTraceLimit = parseInt(process.env.MAX_STACK_TRACE) || 50;
-  report.reportOnUncaughtException = !!process.env.REPORT_CRASH || false;
+  Error.stackTraceLimit = parseInt(process.env.MAX_STACK_TRACE, 10) || 50;
+  report.reportOnUncaughtException = Boolean(process.env.REPORT_CRASH) || false;
 }
 
 if (report.reportOnUncaughtException) {
@@ -314,15 +305,6 @@ if (report.reportOnUncaughtException) {
 process.on("SIGTERM", () => {
   log.warn("Got SIGTERM");
 });
-/*
-process.on("SIGINT", () => {
-  log.warn("Got SIGINT");
-});
-*/
-// process.on("SIGKILL", () => {
-//   log.warn("Got SIGKILL");
-// });
-
 
 
 export default app;

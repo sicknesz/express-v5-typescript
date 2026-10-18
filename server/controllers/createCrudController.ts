@@ -1,13 +1,13 @@
-import express from 'express';
 import mongoose from "mongoose"
 import type { Request, Response } from "express"
 import type { Model } from "mongoose"
-import type { IAccountDocument } from "../models/Account.ts";
+// import type { IAccountDocument } from "../models/Account.ts";
+// import type { IExerciseDocument } from "../models/Exercise.ts";
+// import type { ITestDocument } from "../models/Test.ts";
 
-type Resource = IAccountDocument;
-type Entity = Model<Resource>;
 
-// FIXME : any
+type Entity = Model<any> // Model<IAccountDocument> | Model<IExerciseDocument> | Model<ITestDocument>;
+
 const create = async (model: Entity, req: Request, res: Response) => {
 
   const result = await new model({
@@ -97,6 +97,59 @@ const update = async (model: Entity, req: Request, res: Response) => {
   }
 };
 
+const pagination = async (model: Entity, req: Request, res: Response) => {
+
+  const {
+    query: {
+      page: pageString = "1",
+      pageSize: pageSizeString = "50",
+    },
+  } = req;
+
+  if (typeof pageString !== "string" || typeof pageSizeString !== "string") {
+    return;
+  }
+
+  const page = parseInt(pageString, 10);
+  const pageSize = parseInt(pageSizeString, 10);
+
+  const paginatedQuery = isNaN(page) ? [] : [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }];
+
+  const facetStage = {
+    $facet: {
+      metadata: [{ $count: "rowCount" }],
+      users: paginatedQuery,
+    },
+  };
+
+  const matchStage = { $match: {} };
+
+  // FIXME: typescript error
+  // const sortStage = { $sort: { "createdAt": 1 } };
+
+  const aggregatePipeline = [matchStage/*, sortStage*/, facetStage];
+
+  const [aggregate] = await model.aggregate(aggregatePipeline);
+  if (aggregate.metadata.length !== 0) {
+    const {
+      metadata: [{ rowCount }],
+      entities = [],
+    } = aggregate;
+
+    return res.status(200).json({
+      entities,
+      rowCount,
+    });
+  }
+
+  return res.status(200).json({
+    entities: [],
+    rowCount: 0,
+  });
+
+
+};
+
 const remove = async (model: Entity, req: Request, res: Response) => {
 
   // Find the document by id and delete it
@@ -131,11 +184,31 @@ function createCRUDController(modelName: string) {
   const model = mongoose.model(modelName);
 
   const methods = {
-    create: { path: `/api/${modelName.toLocaleLowerCase()}/`, handler: (req: Request, res: Response) => create(model, req, res) },
-    read: { path: `/api/${modelName.toLocaleLowerCase()}/:id`, handler: (req: Request, res: Response) => read(model, req, res) },
-    readAll: { path: `/api/${modelName.toLocaleLowerCase()}/`, handler: (req: Request, res: Response) => readAll(model, req, res) },
-    update: { path: `/api/${modelName.toLocaleLowerCase()}/:id`, handler: (req: Request, res: Response) => update(model, req, res) },
-    delete: { path: `/api/${modelName.toLocaleLowerCase()}/:id`, handler: (req: Request, res: Response) => remove(model, req, res) },
+    create: {
+      path: `/api/${modelName.toLocaleLowerCase()}/`,
+      handler: (req: Request, res: Response) => create(model as Model<any>, req, res)
+    },
+    // WIP : needs to be tested/debugged --- untested
+    pagination: {
+      path: `/api/${modelName.toLocaleLowerCase()}/`,
+      handler: (req: Request, res: Response) => pagination(model as Model<any>, req, res)
+    },
+    readAll: {
+      path: `/api/${modelName.toLocaleLowerCase()}/`,
+      handler: (req: Request, res: Response) => readAll(model as Model<any>, req, res)
+    },
+    read: {
+      path: `/api/${modelName.toLocaleLowerCase()}/:id`,
+      handler: (req: Request, res: Response) => read(model as Model<any>, req, res)
+    },
+    update: {
+      path: `/api/${modelName.toLocaleLowerCase()}/:id`,
+      handler: (req: Request, res: Response) => update(model as Model<any>, req, res)
+    },
+    delete: {
+      path: `/api/${modelName.toLocaleLowerCase()}/:id`,
+      handler: (req: Request, res: Response) => remove(model as Model<any>, req, res)
+    }
   }
 
   return methods

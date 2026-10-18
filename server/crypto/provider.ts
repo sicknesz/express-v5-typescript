@@ -3,7 +3,6 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { open, stat, rename, rm, type FileHandle } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 
-
 const ALGORITHM = 'aes-256-gcm';
 const DIGEST = 'sha512';
 const ITERATIONS = 210_000;
@@ -24,7 +23,7 @@ function deriveKey(masterkey: string, salt: Buffer): Buffer {
   return crypto.pbkdf2Sync(masterkey, salt, ITERATIONS, KEY_LEN, DIGEST);
 }
 
-async function readAt(file: FileHandle, length: number, position: number): Promise<Buffer> {
+async function getBufferAt(file: FileHandle, length: number, position: number): Promise<Buffer> {
   const buffer = Buffer.alloc(length);
   await file.read(buffer, { position });
   return buffer;
@@ -71,14 +70,16 @@ export async function decryptFile(inputFilename: string, outputFilename: string,
   let header: Buffer;
   let tag: Buffer;
   try {
-    header = await readAt(fileHandle, HEADER_LEN, VERSION_OFFSET);
-    tag = await readAt(fileHandle, TAG_LEN, tagOffset);
+    header = await getBufferAt(fileHandle, HEADER_LEN, VERSION_OFFSET);
+    tag = await getBufferAt(fileHandle, TAG_LEN, tagOffset);
   } finally {
     await fileHandle.close();
   }
 
   const version = header[VERSION_OFFSET];
-  if (version !== VERSION) throw new Error(`Unsupported version: ${version}`);
+  if (version !== VERSION) {
+    throw new Error(`Unsupported version: ${version}`);
+  }
 
   const salt = header.subarray(SALT_OFFSET, IV_OFFSET);
   const iv = header.subarray(IV_OFFSET, HEADER_LEN);
@@ -96,7 +97,7 @@ export async function decryptFile(inputFilename: string, outputFilename: string,
       createWriteStream(tmp),
       { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
     );
-    await rename(tmp, outputFilename); // seulement si l'authentification a réussi
+    await rename(tmp, outputFilename);
   } catch (err) {
     await rm(tmp, { force: true });
     throw err;

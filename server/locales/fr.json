@@ -1,0 +1,10 @@
+{
+   "MissingPasswordError": "Mot de passe manquant",
+   "AttemptTooSoonError": "Votre compte est actuellement verrouillé. Essayez plus tard.",
+   "TooManyAttemptsError": "Compte verrouillé pour une durée de 5 minutes à cause d'un trop grand nombre d'échecs",
+   "UserExistsError": "Nom d'utilisateur déjà pris",
+   "NoSaltValueStoredError": "Authentification impossible, sel manquant",
+   "IncorrectPasswordError": "Mot de passe ou utilisateur incorrect",
+   "IncorrectUsernameError": "Mot de passe ou utilisateur incorrect",
+   "MissingUsernameError": "Pas de nom d'utilisateur"
+}
