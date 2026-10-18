@@ -45,15 +45,12 @@ function isAccount(user: Express.User | AccountAttributes): user is AccountAttri
   return ACCOUNT_KEYS.every((k) => k in user);
 }
 
-// load abilities for each request reaching this router
+// load user's permissions (abilities) for each request reaching this router
 router.use((req: Request, _, next) => {
-  log.debug(req.user, "Loading abilities for ");
   if (req.user && isAccount(req.user)) {
     req.ability = getAbilityFor(req.user);
-    log.debug(req.ability, "Loading abilities for ");
     req.PermissionError = ForbiddenError.from(req.ability);
   }
-  log.debug(req.ability, "passing request to next middleware...");
   next();
 });
 
@@ -72,7 +69,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/execute/', async (req: Request, res: Response) => {
 
   const { PermissionError } = req;
-  PermissionError.throwUnlessCan(["create", "execute"], "exercise");
+  PermissionError.throwUnlessCan('execute', "exercise");
 
   const { sourceCode, timeoutMs } = req.body;
 
