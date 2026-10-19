@@ -1,18 +1,63 @@
-import fs from "node:fs/promises"
-import path from "node:path"
-import jwt from "jsonwebtoken"
+import fs from "node:fs/promises";
+import path from "node:path";
+import jwt from "jsonwebtoken";
+import passport from "passport";
 import { pipeline } from "node:stream";
 import { createGzip } from "node:zlib";
 import { createReadStream, createWriteStream } from "node:fs";
 
 // Types import
 import type { IAccount, IAccountDocument } from "../models/Account.ts"
-import type { IRouter } from "express";
+import type { IRouter, Request } from "express";
 
 // Types definition
 type Methods = { get: boolean, post: boolean, put: boolean, delete: boolean }
+type AuthenticateSuccess = { user: IAccountDocument, info: object };
+type LoginSuccess = { user: IAccount, token: string, error: null };
+type Failure<E extends Error> = { user: null, token: null, error: E };
+type AuthenticateCallback = Promise<AuthenticateSuccess | Failure<Error>>;
+type LoginCallback = Promise<LoginSuccess | Failure<Error>>;
+
+// this auth and gets a Document (with toJSON()) from db
+export function authenticateAsync(req: Request, strategy: string, options = {}): AuthenticateCallback {
+  return new Promise((resolve, reject) => {
+    passport.authenticate(strategy, options, (err: Error, user: IAccountDocument, info = {}) => {
+      if (err) {
+        reject(err);
+      }
+      if (!user) {
+        reject(new Error("Authentication failed"));
+      }
+      resolve({ user, info });
+    })(req);
+  });
+}
+
+// this takes a IAccountDocument and return a IAccount object (POJO)
+export async function logAndReturnToken(req: Request, user: IAccountDocument): LoginCallback {
+  return new Promise((resolve, reject) => {
+    req.logIn(user, async (err: Error) => {
+      if (err) {
+        reject({ error: err, user: null, token: null });
+      }
+
+      const authTokenPayload = {
+        _id: user._id.toString(),
+        scope: "auth",
+      };
+
+      const authToken = await generateToken(authTokenPayload);
+      resolve({
+        error: null,
+        user: getCleanUser(user),
+        token: authToken,
+      });
+    });
+  });
+}
 
 const readFilePermission = 'fs.read';
+
 
 export async function generateToken(payload: object, expiresIn: jwt.SignOptions['expiresIn'] = "7d") {
   const token = jwt.sign(payload, (process.env.JWT_SECRET || "secret") as string, { expiresIn } as jwt.SignOptions);

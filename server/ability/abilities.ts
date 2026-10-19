@@ -38,7 +38,6 @@ export function getRulesFor(user: IAccountDocument): RawRuleOf<AppAbility>[] {
 }
 
 
-
 function getAdminRules(builder: AbilityBuilder<AppAbility>) {
   const { can: allow } = builder;
   allow("manage", "all");

@@ -1,15 +1,14 @@
-type Value<V> = { expiresAt: number, value: V };
-
-export default class LRUCache<K, V> {
+type Timestamped<Value> = { expiresAt: number, value: Value };
+export default class LRUCache<Key, Value> {
 
   capacity: number;
-  cache: Map<K, Value<V>>;
+  cache: Map<Key, Timestamped<Value>>;
   ttlMs: number;
 
   constructor(capacity: number, ttlMs: number) {
     this.capacity = capacity;
     this.ttlMs = ttlMs;
-    this.cache = new Map<K, Value<V>>();
+    this.cache = new Map<Key, Timestamped<Value>>();
   }
 
   get iterator() {
@@ -33,9 +32,9 @@ export default class LRUCache<K, V> {
     return entry;
   }
 
-  get(key: K): V | null {
+  get(key: Key): Value | null {
 
-    this.removeExpiredEntries();
+    this.purgeExpiredEntries();
 
     // if present 
     if (!this.cache.has(key)) {
@@ -60,9 +59,13 @@ export default class LRUCache<K, V> {
     return entry.value;
   }
 
-  set(key: K, value: V) {
+  delete(key: Key): boolean {
+    return this.cache.delete(key);
+  }
 
-    this.removeExpiredEntries();
+  set(key: Key, value: Value): void {
+
+    this.purgeExpiredEntries();
 
     if (this.cache.size >= this.capacity) {
       // remove oldest 
@@ -76,7 +79,7 @@ export default class LRUCache<K, V> {
     this.cache.set(key, { expiresAt: deadLine, value: value });
   }
 
-  removeExpiredEntries() {
+  purgeExpiredEntries(): void {
     for (const [key, value] of this.cache.entries()) {
       if (Date.now() > value.expiresAt) {
         this.cache.delete(key);
@@ -84,7 +87,7 @@ export default class LRUCache<K, V> {
     }
   }
 
-  clear() {
+  clear(): void {
     this.cache.clear();
   }
 }
