@@ -5,7 +5,6 @@ import type { Model } from "mongoose"
 // import type { IExerciseDocument } from "../models/Exercise.ts";
 // import type { ITestDocument } from "../models/Test.ts";
 
-
 type Entity = Model<any> // Model<IAccountDocument> | Model<IExerciseDocument> | Model<ITestDocument>;
 
 const create = async (model: Entity, req: Request, res: Response) => {
@@ -13,6 +12,14 @@ const create = async (model: Entity, req: Request, res: Response) => {
   const result = await new model({
     ...req.body,
   }).save();
+
+  if (!result) {
+    return res.status(401).json({
+      success: false,
+      result: null,
+      message: 'Unauthorized',
+    });
+  }
 
   // Returning successfull response
   return res.status(200).json({
@@ -34,15 +41,14 @@ const read = async (model: Entity, req: Request, res: Response) => {
       result: null,
       message: 'No document found ',
     });
-
-  } else {
-    // Return success resposne
-    return res.status(200).json({
-      success: true,
-      result,
-      message: 'we found this document ',
-    });
   }
+
+  // Return success resposne
+  return res.status(200).json({
+    success: true,
+    result,
+    message: 'we found this document ',
+  });
 };
 
 // Warning : use pagination on big collections
@@ -59,28 +65,20 @@ const readAll = async (model: Entity, req: Request, res: Response) => {
       message: 'No document found ',
     });
 
-  } else {
-    // Return success resposne
-    return res.status(200).json({
-      success: true,
-      result,
-      message: 'we found this document ',
-    });
   }
+  // Return success resposne
+  return res.status(200).json({
+    success: true,
+    result,
+    message: 'we found this document ',
+  });
 };
 
 const update = async (model: Entity, req: Request, res: Response) => {
-
-  const result = await model.findOneAndUpdate(
-    {
-      _id: req.params.id
-    },
-    req.body,
-    {
-      new: true, // return the new result instead of the old one
-      runValidators: true,
-    }
-  ).exec();
+  const { params: { id: entityId } } = req;
+  const queryOptions = { new: true, runValidators: true };
+  const query = await model.findOneAndUpdate({ _id: entityId }, { $set: req.body }, queryOptions);
+  const result = query.exec();
 
   if (!result) {
     return res.status(404).json({
@@ -88,13 +86,14 @@ const update = async (model: Entity, req: Request, res: Response) => {
       result: null,
       message: 'No document found ',
     });
-  } else {
-    return res.status(200).json({
-      success: true,
-      result,
-      message: 'we update this document ',
-    });
   }
+
+  return res.status(200).json({
+    success: true,
+    result,
+    message: 'we update this document ',
+  });
+
 };
 
 const pagination = async (model: Entity, req: Request, res: Response) => {
@@ -130,39 +129,25 @@ const pagination = async (model: Entity, req: Request, res: Response) => {
   const aggregatePipeline = [matchStage/*, sortStage*/, facetStage];
 
   const [aggregate] = await model.aggregate(aggregatePipeline);
-  if (aggregate.metadata.length !== 0) {
-    const {
-      metadata: [{ rowCount }],
-      entities = [],
-    } = aggregate;
-
+  if (aggregate.metadata.length === 0) {
     return res.status(200).json({
-      entities,
-      rowCount,
+      entities: [],
+      rowCount: 0,
     });
   }
 
+  const { metadata: [{ rowCount }], entities = [] } = aggregate;
   return res.status(200).json({
-    entities: [],
-    rowCount: 0,
+    entities,
+    rowCount,
   });
-
 
 };
 
 const remove = async (model: Entity, req: Request, res: Response) => {
 
   // Find the document by id and delete it
-  const result = await model.findOneAndUpdate(
-    {
-      _id: req.params.id,
-    },
-    { $set: req.body },
-    {
-      new: true, // return the new result instead of the old one
-    }
-  ).exec();
-
+  const result = await model.findOneAndUpdate({ _id: req.params.id }, { $set: req.body }, { new: true }).exec();
 
   // If no results found, return document not found
   if (!result) {
@@ -171,19 +156,19 @@ const remove = async (model: Entity, req: Request, res: Response) => {
       result: null,
       message: 'No document found ',
     });
-  } else {
-    return res.status(200).json({
-      success: true,
-      result,
-      message: 'Successfully Deleted the document ',
-    });
   }
+
+  return res.status(200).json({
+    success: true,
+    result,
+    message: 'Successfully Deleted the document ',
+  });
 };
 
 function createCRUDController(modelName: string) {
   const model = mongoose.model(modelName);
 
-  const methods = {
+  return {
     create: {
       path: `/api/${modelName.toLocaleLowerCase()}/`,
       handler: (req: Request, res: Response) => create(model as Model<any>, req, res)
@@ -210,9 +195,6 @@ function createCRUDController(modelName: string) {
       handler: (req: Request, res: Response) => remove(model as Model<any>, req, res)
     }
   }
-
-  return methods
-
 }
 
 
