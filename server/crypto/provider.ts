@@ -41,15 +41,15 @@ export async function encryptFile(inputFilename: string, outputFilename: string,
 
   try {
     await pipeline(
-      createReadStream(inputFilename),
-      cipher,
+      createReadStream(inputFilename),                                            // read input
+      cipher,                                                                     // cipher stream
       async function* (source) {
-        yield header;                                     // header (version)
-        for await (const chunk of source) yield chunk;    // content 
-        yield cipher.getAuthTag();                        // auth tag      
+        yield header;                                                             // header (version)
+        for await (const chunk of source) yield chunk;                            // content 
+        yield cipher.getAuthTag();                                                // auth tag      
       },
-      createWriteStream(outputFilename),
-      { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
+      createWriteStream(outputFilename),                                          // write output
+      { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) } // abort/timeout signals
     );
   }
   catch (err) {
@@ -92,9 +92,9 @@ export async function decryptFile(inputFilename: string, outputFilename: string,
   const tmp = `${outputFilename}.tmp`;
   try {
     await pipeline(
-      createReadStream(inputFilename, { start: HEADER_LEN, end: tagOffset - LAST_BYTE }),
-      decipher,
-      createWriteStream(tmp),
+      createReadStream(inputFilename, { start: HEADER_LEN, end: tagOffset - LAST_BYTE }), // read input
+      decipher,                                                                           // decipher
+      createWriteStream(tmp),                                                             // write output
       { signal: AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) }
     );
     await rename(tmp, outputFilename);

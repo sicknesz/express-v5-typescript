@@ -131,6 +131,7 @@ test("LRU should return the head when calling .tail()", () => {
 })
 
 test("LRU should be empty after calling cache.clear()", () => {
+
     const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);

@@ -11,8 +11,96 @@ export interface Cache<Key, Value> {
   clear(): void;
   purge(): void;
 };
+/*
+type WithFrequency<Value> = Timestamped<Value> & { frequency: number };
+
+export class LFUCache<Key, Value> implements Cache<Key, Value> {
+
+  #capacity: number;
+  #cache: Map<Key, WithFrequency<Value>>;
+  #ttlMs: number;
+
+  constructor({ capacity, ttlMs, purgeInterval }: CacheOptions) {
+    this.#capacity = capacity;
+    this.#ttlMs = ttlMs;
+    this.#cache = new Map<Key, WithFrequency<Value>>();
+
+    // setInterval(this.purge.bind(this), purgeInterval);
+  }
+
+  [Symbol.iterator]() {
+    return this.#cache[Symbol.iterator]();
+  }
+
+  get cache() {
+    return this.#cache;
+  }
+
+  get iterator() {
+    const iterator = this.#cache[Symbol.iterator]();
+    return iterator;
+  }
+
+  get size() {
+    return this.#cache.size;
+  }
+
+  get head(): [Key, Value] | undefined {
+    const iterator = this.#cache[Symbol.iterator]();
+    const entry = iterator.next().value;
+    if (!entry) {
+      return undefined;
+    }
+    const [key, value] = entry;
+    return [key, value.value];
+  }
+
+  get tail(): [Key, Value] | undefined {
+    const result = [...this.#cache];
+    const entry = result[result.length - 1];
+    if (!entry) {
+      return undefined;
+    }
+    const [key, value] = entry;
+    return [key, value.value];
+  }
+
+  addJitter(ttlMs: number) {
+    const randomJitter = Math.round(Math.random() * 1000);
+    return ttlMs + randomJitter;
+  }
+
+  values() {
+    const entries = this.#cache.values();
+    const values = entries.map(e => e.value);
+    return values;
+  }
+
+  keys() {
+    const keys = this.#cache.keys();
+    return keys;
+  }
+
+  delete(key: Key): boolean {
+    return this.#cache.delete(key);
+  }
+
+  get(key: Key): Value | undefined {
+
+    if (this.#cache.size >= this.#capacity) {
+      // remove least frequently used element
+    }
+
+    return;
+  }
 
 
+
+  clear() {
+    this.#cache.clear();
+  }
+}
+*/
 /**
  * @brief TTL based LRU (Least Recently Used) cache using Map<K,V> internally 
  * @example 
@@ -28,7 +116,7 @@ export interface Cache<Key, Value> {
  * ```
  */
 export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number };
-export default class LRUCache<Key, Value> implements Cache<Key, Value> {
+export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   #capacity: number;
   #cache: Map<Key, Timestamped<Value>>;
@@ -79,6 +167,11 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     return [key, value.value];
   }
 
+  addJitter(ttlMs: number) {
+    const randomJitter = Math.round(Math.random() * 1000);
+    return ttlMs + randomJitter;
+  }
+
   values() {
     const entries = this.#cache.values();
     const values = entries.map(e => e.value);
@@ -110,7 +203,8 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     }
     // to maintain the head as the least recently used 
     this.#cache.delete(key);
-    this.#cache.set(key, { expiresAt: Date.now() + this.#ttlMs, value: value });
+    const deadLine = Date.now() + this.addJitter(this.#ttlMs);
+    this.#cache.set(key, { expiresAt: deadLine, value: value });
 
     return value;
   }
@@ -129,7 +223,7 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
       }
     }
 
-    const deadLine = Date.now() + ttl;
+    const deadLine = Date.now() + this.addJitter(ttl);
     this.#cache.set(key, { expiresAt: deadLine, value: value });
     return this;
   }

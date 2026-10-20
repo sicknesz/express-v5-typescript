@@ -106,7 +106,9 @@ const pagination = async (model: Entity, req: Request, res: Response) => {
   } = req;
 
   if (typeof pageString !== "string" || typeof pageSizeString !== "string") {
-    return;
+    return res.status(500).json({
+      error: new Error("Missing page and pageSize for a paginated request")
+    });
   }
 
   const page = parseInt(pageString, 10);
