@@ -1,94 +1,127 @@
+
 type Timestamped<Value> = { expiresAt: number, value: Value };
-export default class LRUCache<Key, Value> {
 
-  capacity: number;
-  cache: Map<Key, Timestamped<Value>>;
-  ttlMs: number;
 
-  constructor(capacity: number, ttlMs: number) {
-    this.capacity = capacity;
-    this.ttlMs = ttlMs;
-    this.cache = new Map<Key, Timestamped<Value>>();
+// eslint-disable-next-line
+export interface Cache<Key, Value> {
+  values(): MapIterator<Value>;
+  keys(): MapIterator<Key>;
+  get(key: Key): Value | undefined;
+  delete(key: Key): boolean;
+  set(key: Key, value: Value): this;
+  clear(): void;
+  purgeExpiredEntries(): void;
+};
+
+export default class LRUCache<Key, Value> implements Cache<Key, Value> {
+
+  #capacity: number;
+  #cache: Map<Key, Timestamped<Value>>;
+  #ttlMs: number;
+
+  constructor(capacity: number, ttlMs: number, purgeInterval: number) {
+    this.#capacity = capacity;
+    this.#ttlMs = ttlMs;
+    this.#cache = new Map<Key, Timestamped<Value>>();
+    setInterval(this.purgeExpiredEntries.bind(this), purgeInterval);
+  }
+
+  [Symbol.iterator]() {
+    return this.#cache[Symbol.iterator]();
+  }
+
+  get cache() {
+    return this.#cache;
   }
 
   get iterator() {
-    const iterator = this.cache[Symbol.iterator]();
+    const iterator = this.#cache[Symbol.iterator]();
     return iterator;
   }
 
   get size() {
-    return this.cache.size;
+    return this.#cache.size;
   }
 
   get head() {
-    const iterator = this.cache[Symbol.iterator]();
+    const iterator = this.#cache[Symbol.iterator]();
     const entry = iterator.next().value;
     return entry;
   }
 
   get tail() {
-    const result = [...this.cache];
+    const result = [...this.#cache];
     const entry = result[result.length - 1];
     return entry;
   }
 
-  get(key: Key): Value | null {
+  values() {
+    const entries = this.#cache.values();
+    const values = entries.map(e => e.value);
+    return values;
+  }
 
-    this.purgeExpiredEntries();
+  keys() {
+    const keys = this.#cache.keys();
+    return keys;
+  }
+
+  get(key: Key): Value | undefined {
 
     // if present 
-    if (!this.cache.has(key)) {
-      return null;
+    if (!this.#cache.has(key)) {
+      return undefined;
     }
 
     // read value 
-    const entry = this.cache.get(key);
+    const entry = this.#cache.get(key);
     if (!entry) {
-      return null;
+      return undefined;
     }
 
     const { expiresAt, value } = entry;
     if (Date.now() > expiresAt) {
-      this.cache.delete(key);
-      return null;
+      this.#cache.delete(key);
+      return undefined;
     }
     // to maintain the head as the least recently used 
-    this.cache.delete(key);
-    this.cache.set(key, { expiresAt: Date.now() + this.ttlMs, value: value });
+    this.#cache.delete(key);
+    this.#cache.set(key, { expiresAt: Date.now() + this.#ttlMs, value: value });
 
-    return entry.value;
+    return value;
   }
 
   delete(key: Key): boolean {
-    return this.cache.delete(key);
+    return this.#cache.delete(key);
   }
 
-  set(key: Key, value: Value): void {
+  set(key: Key, value: Value): this {
 
     this.purgeExpiredEntries();
 
-    if (this.cache.size >= this.capacity) {
+    if (this.#cache.size >= this.#capacity) {
       // remove oldest 
       const { head } = this;
       if (head) {
-        this.cache.delete(head[0]);
+        this.#cache.delete(head[0]);
       }
     }
 
-    const deadLine = Date.now() + this.ttlMs;
-    this.cache.set(key, { expiresAt: deadLine, value: value });
+    const deadLine = Date.now() + this.#ttlMs;
+    this.#cache.set(key, { expiresAt: deadLine, value: value });
+    return this;
   }
 
   purgeExpiredEntries(): void {
-    for (const [key, value] of this.cache.entries()) {
+    for (const [key, value] of this.#cache.entries()) {
       if (Date.now() > value.expiresAt) {
-        this.cache.delete(key);
+        this.#cache.delete(key);
       }
     }
   }
 
   clear(): void {
-    this.cache.clear();
+    this.#cache.clear();
   }
 }
 

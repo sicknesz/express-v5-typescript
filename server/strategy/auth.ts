@@ -9,8 +9,6 @@ import type { Request } from "express";
 
 dotenv.config();
 
-const localLoginStrategy = new LocalStrategy(Account.authenticate());
-
 const tokenExtractor = function (req: Request) {
   return req?.body?.token || req?.query?.token || req.headers.authorization || req.headers.bearer;
 };
@@ -23,19 +21,20 @@ const jwtOptions: passportJWT.StrategyOptionsWithRequest = {
 };
 
 
-const jwtLoginStrategy = new JwtStrategy(jwtOptions, async (_: Request, payload: any, done: passportJWT.VerifiedCallback) => {
-  log.warn(`[JWT]: Stragegy::verify token`, payload)
-
-  const user = await Account.findById(payload._id);
-  if (user) {
-    return done(null, user);
-  }
-
-  done(null, false);
-});
-
-
 function initPassport() {
+
+  const localLoginStrategy = new LocalStrategy(Account.authenticate());
+
+  const jwtLoginStrategy = new JwtStrategy(jwtOptions, async (_: Request, payload: any, done: passportJWT.VerifiedCallback) => {
+    log.warn(`[JWT]: Stragegy::verify token`, payload)
+
+    const user = await Account.findById(payload._id);
+    if (user) {
+      return done(null, user);
+    }
+
+    done(null, false);
+  });
 
   passport.use(Account.createStrategy());
   passport.use(jwtLoginStrategy);   // enable passport JWT strategy
@@ -59,5 +58,4 @@ function initPassport() {
   return passport;
 }
 
-export default jwtLoginStrategy;
 export { initPassport };

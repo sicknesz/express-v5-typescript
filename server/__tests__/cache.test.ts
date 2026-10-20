@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 
 test("LRU should remove the least recently used entry when calling set on a full cache", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000);
+    const cache = new LRUCache<string, number>(5, 10000, 50000);
     cache.set("1", 333); // 0
     cache.set("2", 666); // 1
     cache.set("3", 999); // 2
@@ -32,7 +32,7 @@ test("LRU should remove the least recently used entry when calling set on a full
         }]
     ];
 
-    const result = [...cache.cache];
+    const result = [...cache];
 
     expect(result).toStrictEqual(expected)
 })
@@ -40,7 +40,7 @@ test("LRU should remove the least recently used entry when calling set on a full
 
 test("LRU should mark as lru the latest accessed element", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000);
+    const cache = new LRUCache<string, number>(5, 10000, 50000);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -67,7 +67,7 @@ test("LRU should mark as lru the latest accessed element", () => {
 
 test("LRU should delete element when asked", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000);
+    const cache = new LRUCache<string, number>(5, 10000, 50000, new Map());
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -77,24 +77,19 @@ test("LRU should delete element when asked", () => {
     cache.delete("3");
 
     const keys = ["1", "2", "4", "5"];
-    const values = [
-        { "expiresAt": expect.any(Number), "value": 333 },
-        { "expiresAt": expect.any(Number), "value": 666 },
-        { "expiresAt": expect.any(Number), "value": 444 },
-        { "expiresAt": expect.any(Number), "value": 222 }
-    ];
+    const values = [333, 666, 444, 222];
 
-    const resultKeys = [...cache.cache.keys()];
-    const resultValues = [...cache.cache.values()];
+    const resultKeys = [...cache.keys()];
+    const resultValues = [...cache.values()];
 
     expect(resultKeys).toStrictEqual(keys);
     expect(resultValues).toStrictEqual(values);
 })
 
 
-test("LRU should purge TTL expired element after ttlMs", async () => {
+test("LRU should purge TTL expired element after purge interval", async () => {
 
-    const cache = new LRUCache<string, number>(5, 1); // super low ttl 1ms
+    const cache = new LRUCache<string, number>(5, 1, 5); // super low ttl 1ms - purge every 5ms
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -102,14 +97,13 @@ test("LRU should purge TTL expired element after ttlMs", async () => {
     cache.set("5", 222);
 
     await new Promise((resolve) => setTimeout(resolve, 10)); // sleep for 10ms to allow purge to happen
-    cache.get("1");
 
     const expected: number[] = [];
-    expect([...cache.cache]).toStrictEqual(expected);
+    expect([...cache]).toStrictEqual(expected);
 })
 
 test("LRU should return the head when calling .head()", () => {
-    const cache = new LRUCache<string, number>(5, 1000);
+    const cache = new LRUCache<string, number>(5, 1000, 5000);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -122,7 +116,7 @@ test("LRU should return the head when calling .head()", () => {
 })
 
 test("LRU should return the head when calling .tail()", () => {
-    const cache = new LRUCache<string, number>(5, 1000);
+    const cache = new LRUCache<string, number>(5, 1000, 5000);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -135,7 +129,7 @@ test("LRU should return the head when calling .tail()", () => {
 })
 
 test("LRU should be empty after calling cache.clear()", () => {
-    const cache = new LRUCache<string, number>(5, 1000);
+    const cache = new LRUCache<string, number>(5, 1000, 5000);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -145,5 +139,27 @@ test("LRU should be empty after calling cache.clear()", () => {
     cache.clear();
 
     const expected: number[] = [];
-    expect([...cache.cache]).toStrictEqual(expected);
+    expect([...cache]).toStrictEqual(expected);
 })
+
+// test("LRU can be iterated using for..of", () => {
+//     const cache = new LRUCache<string, number>(5, 1000, 5000);
+//     cache.set("1", 333);
+//     cache.set("2", 666);
+//     cache.set("3", 999);
+//     cache.set("4", 444);
+//     cache.set("5", 222);
+
+//     for (const [key, value] of cache) {
+//         console.log(key, value);
+//     }
+
+//     const keys = ["1", "2", "3", "4", "5"];
+//     const values = [333, 666, 999, 444, 222];
+
+//     const resultKeys = [...cache.keys()];
+//     const resultValues = [...cache.values()];
+
+//     expect(resultKeys).toStrictEqual(keys);
+//     expect(resultValues).toStrictEqual(values);
+// })
