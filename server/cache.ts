@@ -1,25 +1,40 @@
 
 type Timestamped<Value> = { expiresAt: number, value: Value };
 
-
 // eslint-disable-next-line
 export interface Cache<Key, Value> {
   values(): MapIterator<Value>;
   keys(): MapIterator<Key>;
   get(key: Key): Value | undefined;
-  set(key: Key, value: Value): this;
+  set(key: Key, value: Value, ttl: number): this;
   delete(key: Key): boolean;
   clear(): void;
   purge(): void;
 };
 
+
+/**
+ * @brief TTL based LRU (Least Recently Used) cache using Map<K,V> internally 
+ * @example 
+ * ```typescript 
+ *     const options = { capacity: 2, ttlMs: 10000, purgeInterval : 50000 };
+ *     const cache = new LRUCache<string, number>(options);
+ *     cache.set("1", 333); // 0
+ *     cache.set("2", 666); // 1
+ *     cache.set("3", 999); // 2
+ *     cache.set("4", 444); // 3
+ *     // cache contains : [ ["3", 999], ["4", 444] ]
+ *     // after 50000ms the purge is called and all elements older than 10000 will be purged
+ * ```
+ */
+export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number };
 export default class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   #capacity: number;
   #cache: Map<Key, Timestamped<Value>>;
   #ttlMs: number;
 
-  constructor(capacity: number, ttlMs: number, purgeInterval: number) {
+  constructor({ capacity, ttlMs, purgeInterval }: CacheOptions) {
     this.#capacity = capacity;
     this.#ttlMs = ttlMs;
     this.#cache = new Map<Key, Timestamped<Value>>();
@@ -44,16 +59,24 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     return this.#cache.size;
   }
 
-  get head() {
+  get head(): [Key, Value] | undefined {
     const iterator = this.#cache[Symbol.iterator]();
     const entry = iterator.next().value;
-    return entry;
+    if (!entry) {
+      return undefined;
+    }
+    const [key, value] = entry;
+    return [key, value.value];
   }
 
-  get tail() {
+  get tail(): [Key, Value] | undefined {
     const result = [...this.#cache];
     const entry = result[result.length - 1];
-    return entry;
+    if (!entry) {
+      return undefined;
+    }
+    const [key, value] = entry;
+    return [key, value.value];
   }
 
   values() {
@@ -96,22 +119,22 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     return this.#cache.delete(key);
   }
 
-  set(key: Key, value: Value): this {
+  // extra 
+  set(key: Key, value: Value, ttl: number = this.#ttlMs): this {
 
     if (this.#cache.size >= this.#capacity) {
-      // remove oldest 
       const { head } = this;
       if (head) {
         this.#cache.delete(head[0]);
       }
     }
 
-    const deadLine = Date.now() + this.#ttlMs;
+    const deadLine = Date.now() + ttl;
     this.#cache.set(key, { expiresAt: deadLine, value: value });
     return this;
   }
 
-  purge(): void {
+  purge() {
     for (const [key, value] of this.#cache.entries()) {
       if (Date.now() > value.expiresAt) {
         this.#cache.delete(key);
@@ -119,7 +142,7 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     }
   }
 
-  clear(): void {
+  clear() {
     this.#cache.clear();
   }
 }

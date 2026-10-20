@@ -1,11 +1,13 @@
 
-import LRUCache from "../cache.ts"
+import LRUCache, { type CacheOptions } from "../cache.ts"
 // @ts-ignore
 import { expect, test } from "bun:test";
 
+const options: CacheOptions = { capacity: 5, ttlMs: 5000, purgeInterval: 10000 };
+
 test("LRU should remove the least recently used entry when calling set on a full cache", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000, 50000);
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333); // 0
     cache.set("2", 666); // 1
     cache.set("3", 999); // 2
@@ -40,7 +42,7 @@ test("LRU should remove the least recently used entry when calling set on a full
 
 test("LRU should mark as lru the latest accessed element", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000, 50000);
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -67,7 +69,7 @@ test("LRU should mark as lru the latest accessed element", () => {
 
 test("LRU should delete element when asked", () => {
 
-    const cache = new LRUCache<string, number>(5, 10000, 50000, new Map());
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -89,7 +91,7 @@ test("LRU should delete element when asked", () => {
 
 test("LRU should purge TTL expired element after purge interval", async () => {
 
-    const cache = new LRUCache<string, number>(5, 1, 5); // super low ttl 1ms - purge every 5ms
+    const cache = new LRUCache<string, number>({ capacity: 5, ttlMs: 1, purgeInterval: 5 });
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -103,20 +105,20 @@ test("LRU should purge TTL expired element after purge interval", async () => {
 })
 
 test("LRU should return the head when calling .head()", () => {
-    const cache = new LRUCache<string, number>(5, 1000, 5000);
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
     cache.set("4", 444);
     cache.set("5", 222);
-    cache.set("OVERCAPACITY", 111); // this element will remove the 'a' hence the 'b' in the head as expected
+    cache.set("OVERCAPACITY", 111); // this element will remove the '1' hence the '2' in the head as expected
 
     const head = cache.head;
-    expect(head).toStrictEqual(["2", { value: 666, expiresAt: expect.any(Number) }]);
+    expect(head).toStrictEqual(["2", 666]);
 })
 
 test("LRU should return the head when calling .tail()", () => {
-    const cache = new LRUCache<string, number>(5, 1000, 5000);
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -125,11 +127,11 @@ test("LRU should return the head when calling .tail()", () => {
     cache.set("OVERCAPACITY", 111);
 
     const tail = cache.tail;
-    expect(tail).toStrictEqual(["OVERCAPACITY", { value: 111, expiresAt: expect.any(Number) }]);
+    expect(tail).toStrictEqual(["OVERCAPACITY", 111]);
 })
 
 test("LRU should be empty after calling cache.clear()", () => {
-    const cache = new LRUCache<string, number>(5, 1000, 5000);
+    const cache = new LRUCache<string, number>(options);
     cache.set("1", 333);
     cache.set("2", 666);
     cache.set("3", 999);
@@ -143,7 +145,7 @@ test("LRU should be empty after calling cache.clear()", () => {
 })
 
 // test("LRU can be iterated using for..of", () => {
-//     const cache = new LRUCache<string, number>(5, 1000, 5000);
+//     const cache = new LRUCache<string, number>(options);
 //     cache.set("1", 333);
 //     cache.set("2", 666);
 //     cache.set("3", 999);
