@@ -7,10 +7,10 @@ export interface Cache<Key, Value> {
   values(): MapIterator<Value>;
   keys(): MapIterator<Key>;
   get(key: Key): Value | undefined;
-  delete(key: Key): boolean;
   set(key: Key, value: Value): this;
+  delete(key: Key): boolean;
   clear(): void;
-  purgeExpiredEntries(): void;
+  purge(): void;
 };
 
 export default class LRUCache<Key, Value> implements Cache<Key, Value> {
@@ -23,7 +23,8 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     this.#capacity = capacity;
     this.#ttlMs = ttlMs;
     this.#cache = new Map<Key, Timestamped<Value>>();
-    setInterval(this.purgeExpiredEntries.bind(this), purgeInterval);
+
+    setInterval(this.purge.bind(this), purgeInterval);
   }
 
   [Symbol.iterator]() {
@@ -97,8 +98,6 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   set(key: Key, value: Value): this {
 
-    this.purgeExpiredEntries();
-
     if (this.#cache.size >= this.#capacity) {
       // remove oldest 
       const { head } = this;
@@ -112,7 +111,7 @@ export default class LRUCache<Key, Value> implements Cache<Key, Value> {
     return this;
   }
 
-  purgeExpiredEntries(): void {
+  purge(): void {
     for (const [key, value] of this.#cache.entries()) {
       if (Date.now() > value.expiresAt) {
         this.#cache.delete(key);
