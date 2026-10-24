@@ -88,7 +88,7 @@ router.post('/execute/', async (req: Request, res: Response) => {
   }
 
   const context = {
-    ...process,       // passing setTimeout, setImmediate, etc ... processNextTick to script 
+    ...process,       
     console: {
       log: logger,
       warn: logger,

@@ -72,29 +72,25 @@ const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
 /**
  * Get port from environment and store in Express.
  */
-const port = normalizePort(process.env.PORT || '3000');
-const server = app.listen(port, async () => {
+const port = normalizePort(process.env.PORT || '3001');
+
+/**
+ * Initialize websocket streams/events handlers 
+ */
+const server = initWebsocket(app);
+if (!server) {
+  throw new Error("Websocket not initialized")
+}
+
+server.listen(port, async () => {
   log.debug(`listening on port ${port}`);
   const client = await connect(app);
   log.debug(`Connected to database ${client.connection.host} ${client.connection.name}`);
 });
 
-/**
- * Initialize websocket streams/events handlers 
- */
-const io = initWebsocket(server);
-if (!io) {
-  throw new Error("Websocket not initialized")
-}
-
-io.on("log:request", (data: string) => {
-  log.debug("[Websocket]:", data)
-})
-
 
 app.use(i18n.init)
 app.set('port', port);
-app.set("socket.io", io);
 
 log.debug("server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
