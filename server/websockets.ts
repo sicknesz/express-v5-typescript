@@ -4,21 +4,19 @@ import { log } from "./app.ts"
 import { createServer } from "node:http";
 import type { Express } from "express"
 import { AuthenticationError } from './errors.ts'
-// import jwt from "jsonwebtoken" -- // TODO : use to auth websockets 
-
 import { runIsolated } from './executor.ts';
-
+// import jwt from "jsonwebtoken" -- // TODO : use to auth websockets 
 
 type ExecutionRequest = { code: string, testCode: string, clientId: string };
 type ExecutionResult = { stderr: string, stdout: string, exitCode: number };
 type ExecutionError = { exitCode: number };
 
 interface ServerToClientEvents {
-  ['nodejs:execute:result']: ({ stderr, stdout, exitCode }: ExecutionResult) => void;
-  ['nodejs:execute:error']: ({ exitCode }: ExecutionError) => void;
+  ['runner:result']: ({ stderr, stdout, exitCode }: ExecutionResult) => void;
+  ['runner:error']: ({ exitCode }: ExecutionError) => void;
 }
 interface ClientToServerEvents {
-  ['nodejs:execute:request']: ({ code, testCode, clientId }: ExecutionRequest) => void;
+  ['runner:request']: ({ code, testCode, clientId }: ExecutionRequest) => void;
 }
 
 interface SocketData {
@@ -44,25 +42,27 @@ export function initWebsocket(app: Express) {
       log.debug(`[Socket.io]: disconnected due to ${reason}`);
     });
 
-    // TODO : testing - probablyt add a try/catch 
-    socket.on("nodejs:execute:request", async ({ code, testCode, clientId }) => {
+    // eslint-disable-next-line
+    socket.on("runner:request", async ({ code, testCode, clientId }) => {
       if (!socket.data.authenticated) {
         throw new AuthenticationError("[socket.io]: unauthorized to execute code as anonymous");
       }
-      log.debug(`[Socket.io]: Got execute request from ${clientId}`, code, testCode);
+
+      const filename = getFilename(clientId);
+      log.debug(`[Socket.io]: Got execute request from ${clientId} - send file : ${filename}`);
 
       // write the file to disk for isolated execution (as it's own process with limited permissions)
-      await fs.writeFile(getFilename(clientId), code, "utf-8");
+      await fs.writeFile(filename, code, "utf-8");
 
       const abortController = new AbortController();
 
-      const result = await runIsolated(clientId, abortController.signal, undefined, 10000);
+      const result = await runIsolated(filename, abortController.signal, undefined, 10000);
       if (result?.exitCode === 0) {
         const { stderr, stdout, exitCode } = result
-        socket.emit("nodejs:execute:result", { stderr, stdout, exitCode });
+        socket.emit("runner:result", { stderr, stdout, exitCode });
       }
       else if (result?.exitCode) {
-        socket.emit("nodejs:execute:error", { exitCode: result.exitCode });
+        socket.emit("runner:error", { exitCode: result.exitCode });
       }
     });
   });
@@ -85,6 +85,7 @@ function getFilename(clientId: string) {
   return `${clientId}.ts`;
 }
 
+// eslint-disable-next-line
 function getTestFilename(clientId: string) {
   return `${clientId}.test.ts`;
 }

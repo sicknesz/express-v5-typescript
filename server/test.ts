@@ -20,12 +20,12 @@ describe("testing filtering function", () => {
   })
 })
 
-// describe("a failing test", () => {
-//   it('should fail to return ranked active users', (t) => {
-//     t.assert.deepEqual(transformUsers(users), [
-//       { name: 'Avery', score: 99, active: true, rank: 2 },
-//       { name: 'Jordan', score: 87, active: true, rank: 3 },
-//     ])
-//   })
-// })
+describe("a failing test", () => {
+  it('should fail to return ranked active users', (t) => {
+    t.assert.deepEqual(transformUsers(users), [
+      { name: 'Avery', score: 99, active: true, rank: 2 },
+      { name: 'Jordan', score: 87, active: true, rank: 3 },
+    ])
+  })
+})
 
