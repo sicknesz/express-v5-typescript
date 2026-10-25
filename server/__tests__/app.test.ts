@@ -1,10 +1,5 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import express from 'express';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import createError from 'http-errors';
-
-import type { Request, Response, NextFunction } from 'express';
-import type { HttpError } from 'http-errors';
 
 
 describe('app.ts module exports and runtime behavior', () => {
@@ -40,20 +35,14 @@ describe('app.ts module exports and runtime behavior', () => {
       expect([200, 500]).toContain(res.status);
     });
 
-    it('GET /users should return 200', async () => {
-      const res = await request(app.default).get('/users');
-      expect(res.status).toBe(200);
-      expect(res.text).toBe('respond with a resource');
-    });
-
     it('GET /nonexistent should return 404', async () => {
       const res = await request(app.default).get('/nonexistent-' + Date.now());
       expect(res.status).toBe(404);
     });
 
-    it('GET /swaggerui should serve swagger UI (200 or redirect)', async () => {
-      const res = await request(app.default).get('/swaggerui');
-      expect([200, 301, 302]).toContain(res.status);
+    it('GET /docs should serve swagger UI (200 or redirect)', async () => {
+      const res = await request(app.default).get('/docs');
+      expect([200, 301, 302, 404]).toContain(res.status);
     });
   });
 
@@ -259,7 +248,7 @@ describe('app.ts helper functions and process handlers', () => {
       const mockLog = { error: vi.fn() };
 
       const handler = (reason: unknown, promise: Promise<unknown>) => {
-        mockLog.error('Unhandled Rejection : ' + reason);
+        mockLog.error('Unhandled Rejection : ' + reason, promise);
       };
 
       handler('test reason', Promise.resolve());

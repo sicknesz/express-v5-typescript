@@ -185,6 +185,8 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   get(key: Key): Value | undefined {
 
+    this.purge();
+
     // if present 
     if (!this.#cache.has(key)) {
       return undefined;
@@ -215,6 +217,8 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   // extra 
   set(key: Key, value: Value, ttl: number = this.#ttlMs): this {
+
+    this.purge();
 
     if (this.#cache.size >= this.#capacity) {
       const { head } = this;

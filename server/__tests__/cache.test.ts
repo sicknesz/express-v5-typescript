@@ -1,7 +1,6 @@
 
-import LRUCache, { type CacheOptions } from "../cache.ts"
-// @ts-ignore
-import { expect, test } from "bun:test";
+import { LRUCache, type CacheOptions } from "../cache.ts"
+import { expect, test } from "vitest";
 
 const options: CacheOptions = { capacity: 5, ttlMs: 5000, purgeInterval: 10000 };
 
@@ -98,7 +97,7 @@ test("LRU should purge TTL expired element after purge interval", async () => {
     cache.set("4", 444);
     cache.set("5", 222);
 
-    await new Promise((resolve) => setTimeout(resolve, 10)); // sleep for 10ms to allow purge to happen
+    await new Promise((resolve) => setTimeout(resolve, 1500)); // sleep for 10ms to allow purge to happen
 
     const expected: number[] = [];
     expect([...cache]).toStrictEqual(expected);
