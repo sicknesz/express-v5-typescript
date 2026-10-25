@@ -71,8 +71,8 @@ router.post('/execute/', async (req: Request, res: Response) => {
   const { PermissionError } = req;
   PermissionError.throwUnlessCan('execute', "exercise");
 
-  const { sourceCode, timeoutMs } = req.body;
-
+  const { sourceCode, timeoutMs, permission } = req.body;
+  
   const stdout: string[] = [];
   const stderr: string[] = [];
   const exitCode: number = 0;
@@ -88,7 +88,7 @@ router.post('/execute/', async (req: Request, res: Response) => {
   }
 
   const context = {
-    ...process,       
+    ...process,
     console: {
       log: logger,
       warn: logger,
