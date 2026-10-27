@@ -9,7 +9,7 @@ export class AuthController {
   static async login(req: Request, res: Response/* , next: NextFunction */) {
     const { body: { username } } = req;
 
-    log.warn(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
+    log.debug(`[authenticate]: ${username} is trying to login with credentials ${username}/************`);
 
     const auth = await authenticateAsync(req, "local", {});
     if (!auth || !auth.user) {
@@ -32,7 +32,7 @@ export class AuthController {
   }
 
   static async logout(req: Request, res: Response) {
-    req.logOut({ keepSessionInfo: false }, (err: Error) => {
+    req.logOut({ keepSessionInfo: false }, (err: unknown) => {
       if (err) {
         return res.json({ success: false, error: err });
       }

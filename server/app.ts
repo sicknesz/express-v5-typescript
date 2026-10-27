@@ -94,8 +94,8 @@ app.set('port', port);
 
 log.debug("server started at " + new Date(Date.now()).toLocaleString("fr-FR"))
 
-app.use(express.json({ limit: "500mb" }));
-app.use(bodyParser.json());
+app.use(express.json({ inflate: false, limit: "50mb" }));
+app.use(bodyParser.json({ inflate: false, limit: "50mb" }));
 
 // TODO : fix cookie/session/token mismatch/mixup
 app.use(cookieParser());
@@ -162,6 +162,8 @@ app.use(
   }),
 )
 
+
+
 // TODO : IMPORTANT - do not forget to set origin 
 app.all("/*splat", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", process.env.ORIGIN ? process.env.ORIGIN : "*");
@@ -174,7 +176,7 @@ app.all("/*splat", (req, res, next) => {
   }
 });
 
-// app.options('*', cors());
+
 
 /**
  * Load unprotected routes

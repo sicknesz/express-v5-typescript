@@ -31,9 +31,6 @@ interface SocketData {
 
 export type Websocket = Socket<ClientToServerEvents, ServerToClientEvents, SocketData>;
 
-// export type Socket<ClientToServerEvents, ServerToClientEvents, SocketData>;
-
-
 export function initWebsocket(app: Express) {
 
   const httpServer = createServer(app);

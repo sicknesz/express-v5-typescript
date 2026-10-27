@@ -31,7 +31,9 @@ export function getRulesFor(user: IAccountDocument): RawRuleOf<AppAbility>[] {
     case 'ROLE_USER': {
       return getUserRules(builder, user);
     }
-    default: builder.can(["read"], "exercise");
+    default:
+      builder.can(["read"], "exercise");
+      break;
   }
 
   return builder.rules;

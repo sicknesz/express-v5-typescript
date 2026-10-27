@@ -29,6 +29,9 @@ const EXERCISE_KEYS = [
   "goal",
   "score",
   "testSnippets",
+  // "status",  
+  // "tests",
+  // "publisherId"
 ] as const satisfies readonly (keyof ExerciseAttributes)[];
 
 const ACCOUNT_KEYS = [
@@ -37,10 +40,12 @@ const ACCOUNT_KEYS = [
   'email'
 ] as const satisfies readonly (keyof AccountAttributes)[];
 
+// TODO: group in a file guards.ts
 function isExercise(doc: unknown): doc is ExerciseAttributes {
   return typeof doc === "object" && doc !== null && EXERCISE_KEYS.every((k) => k in doc);
 }
 
+// TODO: group in a file guards.ts
 function isAccount(user: Express.User | AccountAttributes): user is AccountAttributes {
   return typeof user === "object" && user !== null && ACCOUNT_KEYS.every((k) => k in user);
 }
