@@ -67,7 +67,7 @@ import i18n from "i18n";
 // export attributes for ACL/ability conditions 
 export type AccountAttributes = InferSchemaType<typeof AccountSchema>;
 
-AccountSchema.plugin(passportLocalMongoose, pluginOptions);
+AccountSchema.plugin(passportLocalMongoose.default, pluginOptions);
 
 // export the Model (findOne, find, update...)
 export const Account = model<IAccountDocument, IAccountModel>("Account", AccountSchema);

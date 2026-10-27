@@ -4,16 +4,22 @@ import { log } from "./app.ts"
 import { createServer } from "node:http";
 import type { Express } from "express"
 import { AuthenticationError } from './errors.ts'
-import { runIsolated } from './executor.ts';
+import { getTestSummary } from './executor.ts';
+import type { TestResult } from './executor.ts';
+import path from "node:path";
 // import jwt from "jsonwebtoken" -- // TODO : use to auth websockets 
+import type { Socket } from "socket.io"
+
 
 type ExecutionRequest = { code: string, testCode: string, clientId: string };
-type ExecutionResult = { stderr: string, stdout: string, exitCode: number };
 type ExecutionError = { exitCode: number };
 
 interface ServerToClientEvents {
-  ['runner:result']: ({ stderr, stdout, exitCode }: ExecutionResult) => void;
+  ['runner:result']: ({ result }: { result: TestResult[] }) => void;
   ['runner:error']: ({ exitCode }: ExecutionError) => void;
+  ['runner:test:summary']: ({ event }: { event: any }) => void;
+  ['runner:test:fail']: ({ event }: { event: any }) => void;
+  ['runner:test:pass']: ({ event }: { event: any }) => void;
 }
 interface ClientToServerEvents {
   ['runner:request']: ({ code, testCode, clientId }: ExecutionRequest) => void;
@@ -22,6 +28,10 @@ interface ClientToServerEvents {
 interface SocketData {
   authenticated: boolean;
 }
+
+export type Websocket = Socket<ClientToServerEvents, ServerToClientEvents, SocketData>;
+
+// export type Socket<ClientToServerEvents, ServerToClientEvents, SocketData>;
 
 
 export function initWebsocket(app: Express) {
@@ -52,19 +62,13 @@ export function initWebsocket(app: Express) {
       log.debug(`[Socket.io]: Got execute request from ${clientId} - send file : ${filename}`);
 
       // write the file to disk for isolated execution (as it's own process with limited permissions)
-      await fs.writeFile(filename, code, "utf-8");
+      const fullPath = path.join(import.meta.dirname, "public", "uploads", filename);
+      await fs.writeFile(fullPath, code, "utf-8");
 
-      const abortController = new AbortController();
-
-      const result = await runIsolated(filename, abortController.signal, undefined, 10000);
-      if (result?.exitCode === 0) {
-        const { stderr, stdout, exitCode } = result
-        socket.emit("runner:result", { stderr, stdout, exitCode });
-      }
-      else if (result?.exitCode) {
-        socket.emit("runner:error", { exitCode: result.exitCode });
-      }
+      const result: TestResult[] = await getTestSummary(socket, fullPath);
+      socket.emit("runner:result", { result });
     });
+
   });
 
   io.use((socket, next) => {

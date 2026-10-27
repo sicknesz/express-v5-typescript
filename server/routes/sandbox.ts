@@ -42,10 +42,10 @@ function isExercise(doc: unknown): doc is ExerciseAttributes {
 }
 
 function isAccount(user: Express.User | AccountAttributes): user is AccountAttributes {
-  return ACCOUNT_KEYS.every((k) => k in user);
+  return typeof user === "object" && user !== null && ACCOUNT_KEYS.every((k) => k in user);
 }
 
-// load user's permissions (abilities) for each request reaching this router
+
 router.use((req: Request, _, next) => {
   if (req.user && isAccount(req.user)) {
     req.ability = getAbilityFor(req.user);
@@ -71,8 +71,8 @@ router.post('/execute/', async (req: Request, res: Response) => {
   const { PermissionError } = req;
   PermissionError.throwUnlessCan('execute', "exercise");
 
-  const { sourceCode, timeoutMs, permission } = req.body;
-  
+  const { sourceCode, timeoutMs, /* permission */ } = req.body;
+
   const stdout: string[] = [];
   const stderr: string[] = [];
   const exitCode: number = 0;
@@ -114,7 +114,7 @@ router.post('/execute/', async (req: Request, res: Response) => {
 
     return res.json({ success: true, stdout, stderr, exitCode });
   }
-  catch (err: any) {
+  catch (err: unknown) {
     if (err instanceof Error) {
       return res.json({ success: false, error: err });
     }
@@ -123,11 +123,14 @@ router.post('/execute/', async (req: Request, res: Response) => {
 
 });
 
+/*
+ * notes : Node Test Runner uses Test.runInAsyncScope() to sandox tests 
+ */
 router.get('/execute/:id', async (req: Request, res: Response) => {
 
   const exercise = await Exercise.findById({ _id: req.params.id }).lean();
 
-  if (!exercise) {
+  if (!exercise || !isExercise(exercise)) {
     return;
   }
 
@@ -149,7 +152,7 @@ router.get('/execute/:id', async (req: Request, res: Response) => {
   }
 
   const context = {
-    ...process,       // passing setTimeout, setImmediate, etc ... processNextTick to script 
+    ...process,
     console: {
       log: logger,
       warn: logger,
@@ -160,10 +163,6 @@ router.get('/execute/:id', async (req: Request, res: Response) => {
 
   log.debug("[SANDBOX]: Created context for script ");
 
-  if (!isExercise(exercise as ExerciseAttributes)) {
-    return;
-  }
-
   try {
     log.debug("[SANDBOX]: Created context for sandbox");
     const contextified = vm.createContext(context);
@@ -173,7 +172,7 @@ router.get('/execute/:id', async (req: Request, res: Response) => {
     log.debug(exercise.name, "[SANDBOX]: Executed script, last statement returned : " + lastStatement)
     return res.json({ success: true, stdout, stderr, exitCode });
   }
-  catch (err: any) {
+  catch (err: unknown) {
     if (err instanceof Error) {
       return res.json({ success: false, error: err });
     }
