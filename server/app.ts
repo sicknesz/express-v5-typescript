@@ -24,12 +24,20 @@ import { initWebsocket } from "./websockets.ts";
 import { initPassport } from "./strategy/auth.ts"
 import { connect } from "./database.ts"
 import { displayRouterLayer } from "./utils/utils.ts"
-
+import { styleText } from 'node:util';
 // Types import
 import type { Express, Request, Response, NextFunction } from "express";
 
 // Types definition
 type MiddleWare = (req: Request, res: Response, next: NextFunction) => void;
+
+export const green = (msg: string) => styleText('green', msg);
+export const red = (msg: string) => styleText('red', msg);
+export const yellow = (msg: string) => styleText('yellow', msg);
+export const blue = (msg: string) => styleText('blue', msg);
+export const gray = (msg: string) => styleText('gray', msg);
+
+
 
 dotenv.config()
 
@@ -227,8 +235,6 @@ function normalizePort(endpoint: string) {
   return false;
 }
 
-
-
 async function getModels(...middlewares: MiddleWare[]) {
   const modelFolder = path.join(import.meta.dirname, "models");
   const entries = await fs.readdir(modelFolder, { withFileTypes: true, recursive: true });
@@ -297,13 +303,10 @@ if (report.reportOnUncaughtException) {
     }
   });
 }
-
-
 // set signal handlers
 process.on("SIGTERM", () => {
   log.warn("Got SIGTERM");
 });
-
 
 export default app;
 

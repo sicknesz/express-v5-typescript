@@ -1,9 +1,11 @@
-import { promisify, styleText } from 'node:util';
+import { promisify } from 'node:util';
 import child_process from 'node:child_process';
 import { run } from "node:test"
+import { green, red } from "./app.ts"
 
 import type { ExecException } from 'node:child_process';
 import type { Websocket } from "./websockets.ts"
+
 
 const exec = promisify(child_process.exec);
 
@@ -16,8 +18,7 @@ type TestSuccess = {
 type TestFailed = TestSuccess & { error: string };
 export type TestResult = TestSuccess | TestSuccess | TestFailed;
 
-const green = (msg: string) => styleText('green', msg);
-const red = (msg: string) => styleText('red', msg);
+
 
 // TODO: group in a file guards.ts 
 function isExecException(e: ExecException | any): e is ExecException {
@@ -67,32 +68,40 @@ export async function getTestSummary(websocket: Websocket, filename: string): Pr
 
   const results: TestResult[] = []
   const files = [filename];
-  for await (const event of run({ files })) {
+  try {
+    for await (const event of run({ files, isolation: "process", signal: AbortSignal.timeout(30000) })) {
 
-    if (event.type === "test:start") {
-      //websocket.emit("runner:test:start", { event });
+      if (event.type === "test:start") {
+        //websocket.emit("runner:test:start", { event });
+      }
+
+      if (event.type === "test:fail" && event.data.details.type === "test") {
+
+        console.log(red("Failed") + (` : ${event.data.details.classname}/${event.data.name} - runtime: ${event.data.details.duration_ms}ms`));
+        results.push({ status: "FAILED", name: event.data.name, error: event.data.details.error.message, durationMs: event.data.details.duration_ms });
+        // websocket.emit("runner:test:fail", { event });
+      }
+
+      if (event.type === "test:pass" && event.data.details.type === "test") {
+        console.log(green("Passed") + (` : ${event.data.details.classname}/${event.data.name} - runtime: ${event.data.details.duration_ms}ms`));
+        results.push({ status: "PASSED", name: event.data.name, durationMs: event.data.details.duration_ms });
+        //websocket.emit("runner:test:pass", { event });
+      }
+
+      if (event.type === "test:summary" && !event.data.file) {
+        websocket.emit("runner:test:summary", { event });
+      }
     }
-
-    if (event.type === "test:fail" && event.data.details.type === "test") {
-
-      console.log(red("Failed") + (` : ${event.data.details.classname}/${event.data.name} - runtime: ${event.data.details.duration_ms}ms`));
-      results.push({ status: "FAILED", name: event.data.name, error: event.data.details.error.message, durationMs: event.data.details.duration_ms });
-      // websocket.emit("runner:test:fail", { event });
-    }
-
-    if (event.type === "test:pass" && event.data.details.type === "test") {
-      console.log(green("Passed") + (` : ${event.data.details.classname}/${event.data.name} - runtime: ${event.data.details.duration_ms}ms`));
-      results.push({ status: "PASSED", name: event.data.name, durationMs: event.data.details.duration_ms });
-      //websocket.emit("runner:test:pass", { event });
-    }
-
-    if (event.type === "test:summary" && !event.data.file) {
-      websocket.emit("runner:test:summary", { event });
-    }
+    return results;
   }
-
-  return results;
+  catch (err: unknown) {
+    websocket.emit("runner:error", { error: err });
+    return results;
+  }
 }
+
+
+
 
 
 /*

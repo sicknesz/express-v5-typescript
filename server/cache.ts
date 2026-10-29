@@ -101,6 +101,8 @@ export class LFUCache<Key, Value> implements Cache<Key, Value> {
   }
 }
 */
+
+export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number };
 /**
  * @brief TTL based LRU (Least Recently Used) cache using Map<K,V> internally 
  * @example 
@@ -115,7 +117,6 @@ export class LFUCache<Key, Value> implements Cache<Key, Value> {
  *     // after 50000ms the purge is called and all elements older than 10000 will be purged
  * ```
  */
-export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number };
 export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   #capacity: number;
@@ -196,13 +197,13 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
       return undefined;
     }
 
-    const { expiresAt, value } = entry;
-    if (Date.now() > expiresAt) {
-      this.#cache.delete(key);
-      return undefined;
-    }
     // to maintain the head as the least recently used 
     this.#cache.delete(key);
+    const { expiresAt, value } = entry;
+    if (Date.now() > expiresAt) {
+      return undefined;
+    }
+
     const deadLine = Date.now() + this.addJitter(this.#ttlMs);
     this.#cache.set(key, { expiresAt: deadLine, value: value });
 

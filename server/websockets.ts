@@ -12,14 +12,14 @@ import type { Socket } from "socket.io"
 
 
 type ExecutionRequest = { code: string, testCode: string, clientId: string };
-type ExecutionError = { exitCode: number };
+type ExecutionError = { error: unknown };
 
 interface ServerToClientEvents {
   ['runner:result']: ({ result }: { result: TestResult[] }) => void;
-  ['runner:error']: ({ exitCode }: ExecutionError) => void;
+  ['runner:error']: ({ error }: ExecutionError) => void;
   ['runner:test:summary']: ({ event }: { event: any }) => void;
-  ['runner:test:fail']: ({ event }: { event: any }) => void;
-  ['runner:test:pass']: ({ event }: { event: any }) => void;
+  // ['runner:test:fail']: ({ event }: { event: any }) => void;
+  // ['runner:test:pass']: ({ event }: { event: any }) => void;
 }
 interface ClientToServerEvents {
   ['runner:request']: ({ code, testCode, clientId }: ExecutionRequest) => void;
@@ -55,15 +55,26 @@ export function initWebsocket(app: Express) {
         throw new AuthenticationError("[socket.io]: unauthorized to execute code as anonymous");
       }
 
-      const filename = getFilename(clientId);
+      const filename = getTestFilename(clientId);
+      const fullPath = path.join(import.meta.dirname, "public", "uploads", filename);
       log.debug(`[Socket.io]: Got execute request from ${clientId} - send file : ${filename}`);
 
-      // write the file to disk for isolated execution (as it's own process with limited permissions)
-      const fullPath = path.join(import.meta.dirname, "public", "uploads", filename);
-      await fs.writeFile(fullPath, code, "utf-8");
+      try {
 
-      const result: TestResult[] = await getTestSummary(socket, fullPath);
-      socket.emit("runner:result", { result });
+        // write the file to disk for isolated execution (as it's own process with limited permissions)        
+        await fs.writeFile(fullPath, code, "utf-8");
+
+        const result: TestResult[] = await getTestSummary(socket, fullPath);
+        socket.emit("runner:result", { result });
+      }
+      catch (err: unknown) {
+        if (err instanceof Error) {
+          socket.emit("runner:error", { error: err });
+        }
+      }
+      finally {
+        fs.unlink(fullPath);
+      }
     });
 
   });
