@@ -102,7 +102,7 @@ export class LFUCache<Key, Value> implements Cache<Key, Value> {
 }
 */
 
-export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number };
+export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: number, jitter: number };
 /**
  * @brief TTL based LRU (Least Recently Used) cache using Map<K,V> internally 
  * @example 
@@ -117,15 +117,20 @@ export type CacheOptions = { capacity: number, ttlMs: number, purgeInterval: num
  *     // after 50000ms the purge is called and all elements older than 10000 will be purged
  * ```
  */
+
+type PossibleCacheEntry<Key, Value> = [Key, Value] | undefined;
+
 export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   #capacity: number;
   #cache: Map<Key, Timestamped<Value>>;
   #ttlMs: number;
+  #jitter: number;
 
-  constructor({ capacity, ttlMs, purgeInterval }: CacheOptions) {
+  constructor({ capacity, ttlMs, purgeInterval, jitter = 1000 }: CacheOptions) {
     this.#capacity = capacity;
     this.#ttlMs = ttlMs;
+    this.#jitter = jitter;
     this.#cache = new Map<Key, Timestamped<Value>>();
 
     setInterval(this.purge.bind(this), purgeInterval);
@@ -148,7 +153,7 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
     return this.#cache.size;
   }
 
-  get head(): [Key, Value] | undefined {
+  get head(): PossibleCacheEntry<Key, Value> {
     const iterator = this.iterator;
     const entry = iterator.next().value;
     if (!entry) {
@@ -158,7 +163,7 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
     return [key, value.value];
   }
 
-  get tail(): [Key, Value] | undefined {
+  get tail(): PossibleCacheEntry<Key, Value> {
     const result = [...this.#cache];
     const entry = result[result.length - 1];
     if (!entry) {
@@ -169,7 +174,7 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
   }
 
   addJitter(ttlMs: number) {
-    const randomJitter = Math.round(Math.random() * 1000);
+    const randomJitter = Math.round(Math.random() * this.#jitter);
     return ttlMs + randomJitter;
   }
 
@@ -186,11 +191,6 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
 
   get(key: Key): Value | undefined {
 
-    // if present 
-    if (!this.#cache.has(key)) {
-      return undefined;
-    }
-
     // read value 
     const entry = this.#cache.get(key);
     if (!entry) {
@@ -198,12 +198,13 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
     }
 
     // to maintain the head as the least recently used 
-    this.#cache.delete(key);
     const { expiresAt, value } = entry;
     if (Date.now() > expiresAt) {
+      this.#cache.delete(key);
       return undefined;
     }
 
+    this.#cache.delete(key);
     const deadLine = Date.now() + this.addJitter(this.#ttlMs);
     this.#cache.set(key, { expiresAt: deadLine, value: value });
 
@@ -214,6 +215,7 @@ export class LRUCache<Key, Value> implements Cache<Key, Value> {
     return this.#cache.delete(key);
   }
 
+  // returning this to match the Map interface
   set(key: Key, value: Value, ttl: number = this.#ttlMs): this {
 
     if (this.#cache.size >= this.#capacity) {

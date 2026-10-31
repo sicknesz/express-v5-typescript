@@ -8,7 +8,7 @@ function transformUsers(users: User[]) {
     .sort((a: any, b: any) => b.score - a.score)
     .map((u: any, i: number) => ({ ...u, rank: i + 1 }));
 
-  return newUsers
+  return newUsers;
 }
 
 describe("testing filtering function", () => {
